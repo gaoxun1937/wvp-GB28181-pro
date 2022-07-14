@@ -241,8 +241,8 @@ public class ZLMRESTfulUtils {
         param.put("src_url", src_url);
         param.put("dst_url", dst_url);
         param.put("timeout_ms", timeout_ms);
-        param.put("enable_hls", enable_hls);
-        param.put("enable_mp4", enable_mp4);
+        param.put("enable_hls", enable_hls?1:0);
+        param.put("enable_mp4", enable_mp4?1:0);
         param.put("ffmpeg_cmd_key", ffmpeg_cmd_key);
         return sendPost(mediaServerItem, "addFFmpegSource",param, null);
     }

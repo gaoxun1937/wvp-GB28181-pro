@@ -9,14 +9,16 @@ import com.genersoft.iot.vmp.gb28181.transmit.event.request.SIPRequestProcessorP
 import com.genersoft.iot.vmp.gb28181.transmit.event.request.impl.message.IMessageHandler;
 import com.genersoft.iot.vmp.gb28181.transmit.event.request.impl.message.control.ControlMessageHandler;
 import com.genersoft.iot.vmp.storager.IVideoManagerStorage;
-import com.genersoft.iot.vmp.utils.SpringBeanFactory;
-import gov.nist.javax.sip.SipStackImpl;
+import gov.nist.javax.sip.message.SIPRequest;
 import org.dom4j.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import javax.sip.*;
@@ -47,6 +49,10 @@ public class DeviceControlQueryMessageHandler extends SIPRequestProcessorParent 
     @Autowired
     private SIPCommanderFroPlatform cmderFroPlatform;
 
+    @Qualifier("taskExecutor")
+    @Autowired
+    private ThreadPoolTaskExecutor taskExecutor;
+
     @Override
     public void afterPropertiesSet() throws Exception {
         controlMessageHandler.addHandler(cmdType, this);
@@ -60,85 +66,76 @@ public class DeviceControlQueryMessageHandler extends SIPRequestProcessorParent 
     @Override
     public void handForPlatform(RequestEvent evt, ParentPlatform parentPlatform, Element rootElement) {
 
+        SIPRequest request = (SIPRequest) evt.getRequest();
+
         // 此处是上级发出的DeviceControl指令
-        String targetGBId = ((SipURI) ((HeaderAddress) evt.getRequest().getHeader(ToHeader.NAME)).getAddress().getURI()).getUser();
+        String targetGBId = ((SipURI) request.getToHeader().getAddress().getURI()).getUser();
         String channelId = getText(rootElement, "DeviceID");
         // 远程启动功能
-        if (!StringUtils.isEmpty(getText(rootElement, "TeleBoot"))) {
+        if (!ObjectUtils.isEmpty(getText(rootElement, "TeleBoot"))) {
             if (parentPlatform.getServerGBId().equals(targetGBId)) {
                 // 远程启动本平台：需要在重新启动程序后先对SipStack解绑
                 logger.info("执行远程启动本平台命令");
-                cmderFroPlatform.unregister(parentPlatform, null, null);
-
-                Thread restartThread = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            Thread.sleep(3000);
-                            SipProvider up = (SipProvider) SpringBeanFactory.getBean("udpSipProvider");
-                            SipStackImpl stack = (SipStackImpl)up.getSipStack();
-                            stack.stop();
-                            Iterator listener = stack.getListeningPoints();
-                            while (listener.hasNext()) {
-                                stack.deleteListeningPoint((ListeningPoint) listener.next());
-                            }
-                            Iterator providers = stack.getSipProviders();
-                            while (providers.hasNext()) {
-                                stack.deleteSipProvider((SipProvider) providers.next());
-                            }
-                            VManageBootstrap.restart();
-                        } catch (InterruptedException ignored) {
-                        } catch (ObjectInUseException e) {
-                            e.printStackTrace();
-                        }
-                    }
+                try {
+                    cmderFroPlatform.unregister(parentPlatform, null, null);
+                } catch (InvalidArgumentException | ParseException | SipException e) {
+                    logger.error("[命令发送失败] 国标级联 注销: {}", e.getMessage());
+                }
+                taskExecutor.execute(()->{
+                    // 远程启动
+//                    try {
+//                        Thread.sleep(3000);
+//                        SipProvider up = (SipProvider) SpringBeanFactory.getBean("udpSipProvider");
+//                        SipStackImpl stack = (SipStackImpl)up.getSipStack();
+//                        stack.stop();
+//                        Iterator listener = stack.getListeningPoints();
+//                        while (listener.hasNext()) {
+//                            stack.deleteListeningPoint((ListeningPoint) listener.next());
+//                        }
+//                        Iterator providers = stack.getSipProviders();
+//                        while (providers.hasNext()) {
+//                            stack.deleteSipProvider((SipProvider) providers.next());
+//                        }
+//                        VManageBootstrap.restart();
+//                    } catch (InterruptedException | ObjectInUseException e) {
+//                        logger.error("[任务执行失败] 服务重启: {}", e.getMessage());
+//                    }
                 });
-
-                restartThread.setDaemon(false);
-                restartThread.start();
             } else {
                 // 远程启动指定设备
             }
         }
         // 云台/前端控制命令
-        if (!StringUtils.isEmpty(getText(rootElement,"PTZCmd")) && !parentPlatform.getServerGBId().equals(targetGBId)) {
+        if (!ObjectUtils.isEmpty(getText(rootElement,"PTZCmd")) && !parentPlatform.getServerGBId().equals(targetGBId)) {
             String cmdString = getText(rootElement,"PTZCmd");
             Device deviceForPlatform = storager.queryVideoDeviceByPlatformIdAndChannelId(parentPlatform.getServerGBId(), channelId);
             if (deviceForPlatform == null) {
                 try {
-                    responseAck(evt, Response.NOT_FOUND);
-                    return;
-                } catch (SipException e) {
-                    e.printStackTrace();
-                } catch (InvalidArgumentException e) {
-                    e.printStackTrace();
-                } catch (ParseException e) {
-                    e.printStackTrace();
+                    responseAck(request, Response.NOT_FOUND);
+                } catch (SipException | InvalidArgumentException | ParseException e) {
+                    logger.error("[命令发送失败] 错误信息: {}", e.getMessage());
                 }
+                return;
             }
-            cmder.fronEndCmd(deviceForPlatform, channelId, cmdString, eventResult -> {
-                // 失败的回复
-                try {
-                    responseAck(evt, eventResult.statusCode, eventResult.msg);
-                } catch (SipException e) {
-                    e.printStackTrace();
-                } catch (InvalidArgumentException e) {
-                    e.printStackTrace();
-                } catch (ParseException e) {
-                    e.printStackTrace();
-                }
-            }, eventResult -> {
-                // 成功的回复
-                try {
-                    responseAck(evt, eventResult.statusCode);
-                } catch (SipException e) {
-                    e.printStackTrace();
-                } catch (InvalidArgumentException e) {
-                    e.printStackTrace();
-                } catch (ParseException e) {
-                    e.printStackTrace();
-                }
-            });
+            try {
+                cmder.fronEndCmd(deviceForPlatform, channelId, cmdString, eventResult -> {
+                    // 失败的回复
+                    try {
+                        responseAck(request, eventResult.statusCode, eventResult.msg);
+                    } catch (SipException | InvalidArgumentException | ParseException e) {
+                        logger.error("[命令发送失败] 云台/前端回复: {}", e.getMessage());
+                    }
+                }, eventResult -> {
+                    // 成功的回复
+                    try {
+                        responseAck(request, eventResult.statusCode);
+                    } catch (SipException | InvalidArgumentException | ParseException e) {
+                        logger.error("[命令发送失败] 云台/前端回复: {}", e.getMessage());
+                    }
+                });
+            } catch (InvalidArgumentException | SipException | ParseException e) {
+                logger.error("[命令发送失败] 云台/前端: {}", e.getMessage());
+            }
         }
     }
 }

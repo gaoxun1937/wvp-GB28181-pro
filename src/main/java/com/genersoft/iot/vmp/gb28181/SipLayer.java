@@ -1,26 +1,25 @@
 package com.genersoft.iot.vmp.gb28181;
 
 import com.genersoft.iot.vmp.conf.SipConfig;
+import com.genersoft.iot.vmp.gb28181.conf.DefaultProperties;
 import com.genersoft.iot.vmp.gb28181.transmit.ISIPProcessorObserver;
 import gov.nist.javax.sip.SipProviderImpl;
 import gov.nist.javax.sip.SipStackImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ObjectUtils;
 
 import javax.sip.*;
-import java.util.Properties;
-import java.util.TooManyListenersException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
-@Configuration
-public class SipLayer{
+@Component
+@Order(value=1)
+public class SipLayer implements CommandLineRunner {
 
 	private final static Logger logger = LoggerFactory.getLogger(SipLayer.class);
 
@@ -30,93 +29,117 @@ public class SipLayer{
 	@Autowired
 	private ISIPProcessorObserver sipProcessorObserver;
 
-	private SipStackImpl sipStack;
+
+
+	private final Map<String, SipProviderImpl> tcpSipProviderMap = new ConcurrentHashMap<>();
+	private final Map<String, SipProviderImpl> udpSipProviderMap = new ConcurrentHashMap<>();
 
 	private SipFactory sipFactory;
 
+	@Override
+	public void run(String... args) {
+		List<String> monitorIps = new ArrayList<>();
+		// 使用逗号分割多个ip
+		String separator = ",";
+		if (sipConfig.getIp().indexOf(separator) > 0) {
+			String[] split = sipConfig.getIp().split(separator);
+			monitorIps.addAll(Arrays.asList(split));
+		}else {
+			monitorIps.add(sipConfig.getIp());
+		}
 
-	@Bean("sipFactory")
-	SipFactory createSipFactory() {
 		sipFactory = SipFactory.getInstance();
 		sipFactory.setPathName("gov.nist");
-		return sipFactory;
-	}
-	
-	@Bean("sipStack")
-	@DependsOn({"sipFactory"})
-	SipStack createSipStack() throws PeerUnavailableException {
-		Properties properties = new Properties();
-		properties.setProperty("javax.sip.STACK_NAME", "GB28181_SIP");
-		properties.setProperty("javax.sip.IP_ADDRESS", sipConfig.getMonitorIp());
-		/**
-		 * 完整配置参考 gov.nist.javax.sip.SipStackImpl，需要下载源码
-		 * gov/nist/javax/sip/SipStackImpl.class
-		 */
-		properties.setProperty("gov.nist.javax.sip.LOG_MESSAGE_CONTENT", "true");
-		properties.setProperty("gov.nist.javax.sip.DELIVER_UNSOLICITED_NOTIFY", "true"); // 接收所有notify请求，即使没有订阅
-		properties.setProperty("gov.nist.javax.sip.DELIVER_TERMINATED_EVENT_FOR_NULL_DIALOG", "true"); // 为_NULL _对话框传递_终止的_事件
-		properties.setProperty("gov.nist.javax.sip.RELEASE_REFERENCES_STRATEGY", "Normal"); // 会话清理策略
-		properties.setProperty("gov.nist.javax.sip.RELIABLE_CONNECTION_KEEP_ALIVE_TIMEOUT", "10");
-		/**
-		 * sip_server_log.log 和 sip_debug_log.log public static final int TRACE_NONE =
-		 * 0; public static final int TRACE_MESSAGES = 16; public static final int
-		 * TRACE_EXCEPTION = 17; public static final int TRACE_DEBUG = 32;
-		 */
-		properties.setProperty("gov.nist.javax.sip.TRACE_LEVEL", "0");
-		properties.setProperty("gov.nist.javax.sip.SERVER_LOG", "sip_server_log");
-		properties.setProperty("gov.nist.javax.sip.DEBUG_LOG", "sip_debug_log");
-		sipStack = (SipStackImpl) sipFactory.createSipStack(properties);
-
-		return sipStack;
+		if (monitorIps.size() > 0) {
+			for (String monitorIp : monitorIps) {
+				addListeningPoint(monitorIp, sipConfig.getPort());
+			}
+			if (udpSipProviderMap.size() + tcpSipProviderMap.size() == 0) {
+				System.exit(1);
+			}
+		}
 	}
 
-	@Bean(name = "tcpSipProvider")
-	@DependsOn("sipStack")
-	SipProviderImpl startTcpListener() {
-		ListeningPoint tcpListeningPoint = null;
-		SipProviderImpl tcpSipProvider  = null;
+	private void addListeningPoint(String monitorIp, int port){
+		SipStackImpl sipStack;
 		try {
-			tcpListeningPoint = sipStack.createListeningPoint(sipConfig.getMonitorIp(), sipConfig.getPort(), "TCP");
-			tcpSipProvider = (SipProviderImpl)sipStack.createSipProvider(tcpListeningPoint);
+			sipStack = (SipStackImpl)sipFactory.createSipStack(DefaultProperties.getProperties(monitorIp, false));
+		} catch (PeerUnavailableException e) {
+			logger.error("[Sip Server] SIP服务启动失败， 监听地址{}失败,请检查ip是否正确", monitorIp);
+			return;
+		}
+
+		try {
+			ListeningPoint tcpListeningPoint = sipStack.createListeningPoint(monitorIp, port, "TCP");
+			SipProviderImpl tcpSipProvider = (SipProviderImpl)sipStack.createSipProvider(tcpListeningPoint);
+
 			tcpSipProvider.setDialogErrorsAutomaticallyHandled();
 			tcpSipProvider.addSipListener(sipProcessorObserver);
-//			tcpSipProvider.setAutomaticDialogSupportEnabled(false);
-			logger.info("[Sip Server] TCP 启动成功 {}:{}", sipConfig.getMonitorIp(), sipConfig.getPort());
-		} catch (TransportNotSupportedException e) {
-			e.printStackTrace();
-		} catch (InvalidArgumentException e) {
-			logger.error("[Sip Server]  无法使用 [ {}:{} ]作为SIP[ TCP ]服务，可排查: 1. sip.monitor-ip 是否为本机网卡IP; 2. sip.port 是否已被占用"
-					, sipConfig.getMonitorIp(), sipConfig.getPort());
-		} catch (TooManyListenersException e) {
-			e.printStackTrace();
-		} catch (ObjectInUseException e) {
-			e.printStackTrace();
+			tcpSipProviderMap.put(monitorIp, tcpSipProvider);
+
+			logger.info("[Sip Server] tcp://{}:{} 启动成功", monitorIp, port);
+		} catch (TransportNotSupportedException
+				 | TooManyListenersException
+				 | ObjectInUseException
+				 | InvalidArgumentException e) {
+			logger.error("[Sip Server] tcp://{}:{} SIP服务启动失败,请检查端口是否被占用或者ip是否正确"
+					, monitorIp, port);
 		}
-		return tcpSipProvider;
-	}
-	
-	@Bean(name = "udpSipProvider")
-	@DependsOn("sipStack")
-	SipProviderImpl startUdpListener() {
-		ListeningPoint udpListeningPoint = null;
-		SipProviderImpl udpSipProvider = null;
+
 		try {
-			udpListeningPoint = sipStack.createListeningPoint(sipConfig.getMonitorIp(), sipConfig.getPort(), "UDP");
-			udpSipProvider = (SipProviderImpl)sipStack.createSipProvider(udpListeningPoint);
+			ListeningPoint udpListeningPoint = sipStack.createListeningPoint(monitorIp, port, "UDP");
+
+			SipProviderImpl udpSipProvider = (SipProviderImpl)sipStack.createSipProvider(udpListeningPoint);
 			udpSipProvider.addSipListener(sipProcessorObserver);
-//			udpSipProvider.setAutomaticDialogSupportEnabled(false);
-		} catch (TransportNotSupportedException e) {
-			e.printStackTrace();
-		} catch (InvalidArgumentException e) {
-			logger.error("[Sip Server]  无法使用 [ {}:{} ]作为SIP[ UDP ]服务，可排查: 1. sip.monitor-ip 是否为本机网卡IP; 2. sip.port 是否已被占用"
-					, sipConfig.getMonitorIp(), sipConfig.getPort());
-		} catch (TooManyListenersException e) {
-			e.printStackTrace();
-		} catch (ObjectInUseException e) {
-			e.printStackTrace();
+
+			udpSipProviderMap.put(monitorIp, udpSipProvider);
+
+			logger.info("[Sip Server] udp://{}:{} 启动成功", monitorIp, port);
+		} catch (TransportNotSupportedException
+				 | TooManyListenersException
+				 | ObjectInUseException
+				 | InvalidArgumentException e) {
+			logger.error("[Sip Server] udp://{}:{} SIP服务启动失败,请检查端口是否被占用或者ip是否正确"
+					, monitorIp, port);
 		}
-		logger.info("[Sip Server] UDP 启动成功 {}:{}", sipConfig.getMonitorIp(), sipConfig.getPort());
-		return udpSipProvider;
 	}
 
+	public SipFactory getSipFactory() {
+		return sipFactory;
+	}
+
+	public SipProviderImpl getUdpSipProvider(String ip) {
+		if (ObjectUtils.isEmpty(ip)) {
+			return null;
+		}
+		return udpSipProviderMap.get(ip);
+	}
+
+	public SipProviderImpl getUdpSipProvider() {
+		if (udpSipProviderMap.size() != 1) {
+			return null;
+		}
+		return udpSipProviderMap.values().stream().findFirst().get();
+	}
+
+	public SipProviderImpl getTcpSipProvider() {
+		if (tcpSipProviderMap.size() != 1) {
+			return null;
+		}
+		return tcpSipProviderMap.values().stream().findFirst().get();
+	}
+
+	public SipProviderImpl getTcpSipProvider(String ip) {
+		if (ObjectUtils.isEmpty(ip)) {
+			return null;
+		}
+		return tcpSipProviderMap.get(ip);
+	}
+
+	public String getLocalIp(String deviceLocalIp) {
+		if (!ObjectUtils.isEmpty(deviceLocalIp)) {
+			return deviceLocalIp;
+		}
+		return getUdpSipProvider().getListeningPoint().getIPAddress();
+	}
 }

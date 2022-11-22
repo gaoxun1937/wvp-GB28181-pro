@@ -1,9 +1,11 @@
 package com.genersoft.iot.vmp.gb28181.utils;
 
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.genersoft.iot.vmp.gb28181.bean.Device;
 import com.genersoft.iot.vmp.gb28181.bean.DeviceChannel;
+import com.genersoft.iot.vmp.gb28181.bean.TreeType;
+import com.genersoft.iot.vmp.gb28181.event.subscribe.catalog.CatalogEvent;
 import com.genersoft.iot.vmp.utils.DateUtil;
 import org.dom4j.Attribute;
 import org.dom4j.Document;
@@ -12,6 +14,7 @@ import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import javax.sip.RequestEvent;
@@ -29,7 +32,7 @@ public class XmlUtil {
     /**
      * 日志服务
      */
-    private static Logger LOG = LoggerFactory.getLogger(XmlUtil.class);
+    private static Logger logger = LoggerFactory.getLogger(XmlUtil.class);
 
     /**
      * 解析XML为Document对象
@@ -46,7 +49,7 @@ public class XmlUtil {
         try {
             document = saxReader.read(sr);
         } catch (DocumentException e) {
-            LOG.error("解析失败", e);
+            logger.error("解析失败", e);
         }
         return null == document ? null : document.getRootElement();
     }
@@ -116,12 +119,12 @@ public class XmlUtil {
         // 如果是属性
         for (Object o : element.attributes()) {
             Attribute attr = (Attribute) o;
-            if (!StringUtils.isEmpty(attr.getValue())) {
+            if (!ObjectUtils.isEmpty(attr.getValue())) {
                 json.put("@" + attr.getName(), attr.getValue());
             }
         }
         List<Element> chdEl = element.elements();
-        if (chdEl.isEmpty() && !StringUtils.isEmpty(element.getText())) {// 如果没有子元素,只有一个值
+        if (chdEl.isEmpty() && !ObjectUtils.isEmpty(element.getText())) {// 如果没有子元素,只有一个值
             json.put(element.getName(), element.getText());
         }
 
@@ -152,7 +155,7 @@ public class XmlUtil {
             } else { // 子元素没有子元素
                 for (Object o : element.attributes()) {
                     Attribute attr = (Attribute) o;
-                    if (!StringUtils.isEmpty(attr.getValue())) {
+                    if (!ObjectUtils.isEmpty(attr.getValue())) {
                         json.put("@" + attr.getName(), attr.getValue());
                     }
                 }
@@ -182,47 +185,78 @@ public class XmlUtil {
         return xml.getRootElement();
     }
 
-    public static DeviceChannel channelContentHander(Element itemDevice, Device device){
-        Element channdelNameElement = itemDevice.element("Name");
-        String channelName = channdelNameElement != null ? channdelNameElement.getTextTrim().toString() : "";
-        Element statusElement = itemDevice.element("Status");
-        String status = statusElement != null ? statusElement.getTextTrim().toString() : "ON";
+    private enum ChannelType{
+        CivilCode, BusinessGroup,VirtualOrganization,Other
+    }
+
+    public static DeviceChannel channelContentHander(Element itemDevice, Device device, String event){
         DeviceChannel deviceChannel = new DeviceChannel();
-        deviceChannel.setName(channelName);
+        deviceChannel.setDeviceId(device.getDeviceId());
         Element channdelIdElement = itemDevice.element("DeviceID");
-        String channelId = channdelIdElement != null ? channdelIdElement.getTextTrim().toString() : "";
-        deviceChannel.setChannelId(channelId);
-        // ONLINE OFFLINE HIKVISION DS-7716N-E4 NVR的兼容性处理
-        if (status.equals("ON") || status.equals("On") || status.equals("ONLINE") || status.equals("OK")) {
-            deviceChannel.setStatus(1);
+        if (channdelIdElement == null) {
+            logger.warn("解析Catalog消息时发现缺少 DeviceID");
+            return null;
         }
-        if (status.equals("OFF") || status.equals("Off") || status.equals("OFFLINE")) {
-            deviceChannel.setStatus(0);
+        String channelId = channdelIdElement.getTextTrim();
+        if (ObjectUtils.isEmpty(channelId)) {
+            logger.warn("解析Catalog消息时发现缺少 DeviceID");
+            return null;
+        }
+        deviceChannel.setChannelId(channelId);
+        if (event != null && !event.equals(CatalogEvent.ADD) && !event.equals(CatalogEvent.UPDATE)) {
+            // 除了ADD和update情况下需要识别全部内容，
+            return deviceChannel;
         }
 
-        deviceChannel.setManufacture(XmlUtil.getText(itemDevice, "Manufacturer"));
-        deviceChannel.setModel(XmlUtil.getText(itemDevice, "Model"));
-        deviceChannel.setOwner(XmlUtil.getText(itemDevice, "Owner"));
-        deviceChannel.setCivilCode(XmlUtil.getText(itemDevice, "CivilCode"));
-        deviceChannel.setBlock(XmlUtil.getText(itemDevice, "Block"));
-        deviceChannel.setAddress(XmlUtil.getText(itemDevice, "Address"));
-        String businessGroupID = XmlUtil.getText(itemDevice, "BusinessGroupID");
-        if (XmlUtil.getText(itemDevice, "Parental") == null
-                || XmlUtil.getText(itemDevice, "Parental").equals("")) {
-            if (deviceChannel.getChannelId().length() <= 10
-                    || (deviceChannel.getChannelId().length() == 20 && (
-                            Integer.parseInt(deviceChannel.getChannelId().substring(10, 13)) == 215
-                                    || Integer.parseInt(deviceChannel.getChannelId().substring(10, 13)) == 216
-                            )
-                        )
-            ) {
-                deviceChannel.setParental(1);
-            }else {
-                deviceChannel.setParental(0);
+        ChannelType channelType = ChannelType.Other;
+        if (channelId.length() <= 8) {
+            channelType = ChannelType.CivilCode;
+            deviceChannel.setHasAudio(false);
+        }else {
+            if (channelId.length() == 20) {
+                int code = Integer.parseInt(channelId.substring(10, 13));
+                switch (code){
+                    case 215:
+                        channelType = ChannelType.BusinessGroup;
+                        deviceChannel.setHasAudio(false);
+                        break;
+                    case 216:
+                        channelType = ChannelType.VirtualOrganization;
+                        deviceChannel.setHasAudio(false);
+                        break;
+                    case 136:
+                    case 137:
+                    case 138:
+                        deviceChannel.setHasAudio(true);
+                        break;
+                    default:
+                        deviceChannel.setHasAudio(false);
+                        break;
+
+                }
             }
-        } else {
-            // 由于海康会错误的发送65535作为这里的取值,所以这里除非是0否则认为是1
-            deviceChannel.setParental(Integer.parseInt(XmlUtil.getText(itemDevice, "Parental")) == 1?1:0);
+        }
+
+        Element channdelNameElement = itemDevice.element("Name");
+        String channelName = channdelNameElement != null ? channdelNameElement.getTextTrim() : "";
+        deviceChannel.setName(channelName);
+
+        String civilCode = XmlUtil.getText(itemDevice, "CivilCode");
+        deviceChannel.setCivilCode(civilCode);
+        if (channelType == ChannelType.CivilCode && civilCode == null) {
+            deviceChannel.setParental(1);
+            // 行政区划如果没有传递具体值，则推测一个
+            if (channelId.length() > 2) {
+                deviceChannel.setCivilCode(channelId.substring(0, channelId.length() - 2));
+            }
+        }
+        if (channelType.equals(ChannelType.CivilCode)) {
+            // 行政区划其他字段没必要识别了，默认在线即可
+            deviceChannel.setStatus(1);
+            deviceChannel.setParental(1);
+            deviceChannel.setCreateTime(DateUtil.getNow());
+            deviceChannel.setUpdateTime(DateUtil.getNow());
+            return deviceChannel;
         }
         /**
          * 行政区划展示设备树与业务分组展示设备树是两种不同的模式
@@ -230,7 +264,17 @@ public class XmlUtil {
          * 河北省
          *    --> 石家庄市
          *          --> 摄像头
-         *          --> 正定县
+         *String parentId = XmlUtil.getText(itemDevice, "ParentID");
+         if (parentId != null) {
+         if (parentId.contains("/")) {
+         String lastParentId = parentId.substring(parentId.lastIndexOf("/") + 1);
+         String businessGroup = parentId.substring(0, parentId.indexOf("/"));
+         deviceChannel.setParentId(lastParentId);
+         }else {
+         deviceChannel.setParentId(parentId);
+         }
+         }
+         deviceCh          --> 正定县
          *                  --> 摄像头
          *                  --> 摄像头
          *
@@ -243,59 +287,92 @@ public class XmlUtil {
          *             --> 摄像头
          */
         String parentId = XmlUtil.getText(itemDevice, "ParentID");
+        String businessGroupID = XmlUtil.getText(itemDevice, "BusinessGroupID");
         if (parentId != null) {
             if (parentId.contains("/")) {
                 String lastParentId = parentId.substring(parentId.lastIndexOf("/") + 1);
+                if (businessGroupID == null) {
+                    businessGroupID = parentId.substring(0, parentId.indexOf("/"));
+                }
                 deviceChannel.setParentId(lastParentId);
             }else {
                 deviceChannel.setParentId(parentId);
             }
+            // 兼容设备通道信息中自己为自己父节点的情况
+            if (deviceChannel.getParentId().equals(deviceChannel.getChannelId())) {
+                deviceChannel.setParentId(null);
+            }
         }
         deviceChannel.setBusinessGroupId(businessGroupID);
+        if (channelType.equals(ChannelType.BusinessGroup) || channelType.equals(ChannelType.VirtualOrganization)) {
+            // 业务分组和虚拟组织 其他字段没必要识别了，默认在线即可
+            deviceChannel.setStatus(1);
+            deviceChannel.setParental(1);
+            deviceChannel.setCreateTime(DateUtil.getNow());
+            deviceChannel.setUpdateTime(DateUtil.getNow());
+            return deviceChannel;
+        }
 
-//        else {
-//            if (deviceChannel.getChannelId().length() <= 10) { // 此时为行政区划, 上下级行政区划使用DeviceId关联
-//                deviceChannel.setParentId(deviceChannel.getChannelId().substring(0, deviceChannel.getChannelId().length() - 2));
-//            }else if (deviceChannel.getChannelId().length() == 20) {
-//                if (Integer.parseInt(deviceChannel.getChannelId().substring(10, 13)) == 216) { // 虚拟组织
-//                    deviceChannel.setBusinessGroupId(businessGroupID);
-//                }else if (Integer.parseInt(device.getDeviceId().substring(10, 13) )== 118) {//NVR 如果上级设备编号是NVR则直接将NVR的编号设置给通道的上级编号
-//                    deviceChannel.setParentId(device.getDeviceId());
-//                }else if (deviceChannel.getCivilCode() != null) {
-//                    // 设备， 无parentId的20位是使用CivilCode表示上级的设备，
-//                    // 注：215 业务分组是需要有parentId的
-//                    deviceChannel.setParentId(deviceChannel.getCivilCode());
-//                }
-//            }else {
-//                deviceChannel.setParentId(deviceChannel.getDeviceId());
-//            }
-//        }
+        Element statusElement = itemDevice.element("Status");
 
-        if (XmlUtil.getText(itemDevice, "SafetyWay") == null
-                || XmlUtil.getText(itemDevice, "SafetyWay") == "") {
+        if (statusElement != null) {
+            String status = statusElement.getTextTrim().trim();
+            // ONLINE OFFLINE HIKVISION DS-7716N-E4 NVR的兼容性处理
+            if (status.equals("ON") || status.equals("On") || status.equals("ONLINE") || status.equals("OK")) {
+                deviceChannel.setStatus(1);
+            }
+            if (status.equals("OFF") || status.equals("Off") || status.equals("OFFLINE")) {
+                deviceChannel.setStatus(0);
+            }
+        }else {
+            deviceChannel.setStatus(1);
+        }
+        // 识别自带的目录标识
+        String parental = XmlUtil.getText(itemDevice, "Parental");
+        // 由于海康会错误的发送65535作为这里的取值,所以这里除非是0否则认为是1
+        if (!ObjectUtils.isEmpty(parental) && parental.length() == 1 && Integer.parseInt(parental) == 0) {
+            deviceChannel.setParental(0);
+        }else {
+            deviceChannel.setParental(1);
+        }
+
+
+        deviceChannel.setManufacture(XmlUtil.getText(itemDevice, "Manufacturer"));
+        deviceChannel.setModel(XmlUtil.getText(itemDevice, "Model"));
+        deviceChannel.setOwner(XmlUtil.getText(itemDevice, "Owner"));
+        deviceChannel.setCertNum(XmlUtil.getText(itemDevice, "CertNum"));
+        deviceChannel.setBlock(XmlUtil.getText(itemDevice, "Block"));
+        deviceChannel.setAddress(XmlUtil.getText(itemDevice, "Address"));
+        deviceChannel.setPassword(XmlUtil.getText(itemDevice, "Password"));
+
+        String safetyWay = XmlUtil.getText(itemDevice, "SafetyWay");
+        if (ObjectUtils.isEmpty(safetyWay)) {
             deviceChannel.setSafetyWay(0);
         } else {
-            deviceChannel.setSafetyWay(Integer.parseInt(XmlUtil.getText(itemDevice, "SafetyWay")));
+            deviceChannel.setSafetyWay(Integer.parseInt(safetyWay));
         }
-        if (XmlUtil.getText(itemDevice, "RegisterWay") == null
-                || XmlUtil.getText(itemDevice, "RegisterWay") == "") {
+
+        String registerWay = XmlUtil.getText(itemDevice, "RegisterWay");
+        if (ObjectUtils.isEmpty(registerWay)) {
             deviceChannel.setRegisterWay(1);
         } else {
-            deviceChannel.setRegisterWay(Integer.parseInt(XmlUtil.getText(itemDevice, "RegisterWay")));
+            deviceChannel.setRegisterWay(Integer.parseInt(registerWay));
         }
-        deviceChannel.setCertNum(XmlUtil.getText(itemDevice, "CertNum"));
+
         if (XmlUtil.getText(itemDevice, "Certifiable") == null
                 || XmlUtil.getText(itemDevice, "Certifiable") == "") {
             deviceChannel.setCertifiable(0);
         } else {
             deviceChannel.setCertifiable(Integer.parseInt(XmlUtil.getText(itemDevice, "Certifiable")));
         }
+
         if (XmlUtil.getText(itemDevice, "ErrCode") == null
                 || XmlUtil.getText(itemDevice, "ErrCode") == "") {
             deviceChannel.setErrCode(0);
         } else {
             deviceChannel.setErrCode(Integer.parseInt(XmlUtil.getText(itemDevice, "ErrCode")));
         }
+
         deviceChannel.setEndTime(XmlUtil.getText(itemDevice, "EndTime"));
         deviceChannel.setSecrecy(XmlUtil.getText(itemDevice, "Secrecy"));
         deviceChannel.setIpAddress(XmlUtil.getText(itemDevice, "IPAddress"));
@@ -304,43 +381,23 @@ public class XmlUtil {
         } else {
             deviceChannel.setPort(Integer.parseInt(XmlUtil.getText(itemDevice, "Port")));
         }
-        deviceChannel.setPassword(XmlUtil.getText(itemDevice, "Password"));
-        if (NumericUtil.isDouble(XmlUtil.getText(itemDevice, "Longitude"))) {
-            deviceChannel.setLongitude(Double.parseDouble(XmlUtil.getText(itemDevice, "Longitude")));
+
+
+        String longitude = XmlUtil.getText(itemDevice, "Longitude");
+        if (NumericUtil.isDouble(longitude)) {
+            deviceChannel.setLongitude(Double.parseDouble(longitude));
         } else {
             deviceChannel.setLongitude(0.00);
         }
-        if (NumericUtil.isDouble(XmlUtil.getText(itemDevice, "Latitude"))) {
-            deviceChannel.setLatitude(Double.parseDouble(XmlUtil.getText(itemDevice, "Latitude")));
+        String latitude = XmlUtil.getText(itemDevice, "Latitude");
+        if (NumericUtil.isDouble(latitude)) {
+            deviceChannel.setLatitude(Double.parseDouble(latitude));
         } else {
             deviceChannel.setLatitude(0.00);
         }
         deviceChannel.setGpsTime(DateUtil.getNow());
-        if (deviceChannel.getLongitude()*deviceChannel.getLatitude() > 0) {
-            if ("WGS84".equals(device.getGeoCoordSys())) {
-                deviceChannel.setLongitudeWgs84(deviceChannel.getLongitude());
-                deviceChannel.setLatitudeWgs84(deviceChannel.getLatitude());
-                Double[] position = Coordtransform.WGS84ToGCJ02(deviceChannel.getLongitude(), deviceChannel.getLatitude());
-                deviceChannel.setLongitudeGcj02(position[0]);
-                deviceChannel.setLatitudeGcj02(position[1]);
-            }else if ("GCJ02".equals(device.getGeoCoordSys())) {
-                deviceChannel.setLongitudeGcj02(deviceChannel.getLongitude());
-                deviceChannel.setLatitudeGcj02(deviceChannel.getLatitude());
-                Double[] position = Coordtransform.GCJ02ToWGS84(deviceChannel.getLongitude(), deviceChannel.getLatitude());
-                deviceChannel.setLongitudeWgs84(position[0]);
-                deviceChannel.setLatitudeWgs84(position[1]);
-            }else {
-                deviceChannel.setLongitudeGcj02(0.00);
-                deviceChannel.setLatitudeGcj02(0.00);
-                deviceChannel.setLongitudeWgs84(0.00);
-                deviceChannel.setLatitudeWgs84(0.00);
-            }
-        }else {
-            deviceChannel.setLongitudeGcj02(deviceChannel.getLongitude());
-            deviceChannel.setLatitudeGcj02(deviceChannel.getLatitude());
-            deviceChannel.setLongitudeWgs84(deviceChannel.getLongitude());
-            deviceChannel.setLatitudeWgs84(deviceChannel.getLatitude());
-        }
+
+
         if (XmlUtil.getText(itemDevice, "PTZType") == null || "".equals(XmlUtil.getText(itemDevice, "PTZType"))) {
             //兼容INFO中的信息
             Element info = itemDevice.element("Info");
@@ -352,7 +409,6 @@ public class XmlUtil {
         } else {
             deviceChannel.setPTZType(Integer.parseInt(XmlUtil.getText(itemDevice, "PTZType")));
         }
-        deviceChannel.setHasAudio(true); // 默认含有音频，播放时再检查是否有音频及是否AAC
         return deviceChannel;
     }
 }

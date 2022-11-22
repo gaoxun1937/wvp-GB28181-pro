@@ -42,7 +42,7 @@ public class CatalogDataCatch {
             catalogData.setSn(sn);
             catalogData.setTotal(total);
             catalogData.setDevice(device);
-            catalogData.setChannelList(Collections.synchronizedList(new ArrayList<>()));
+            catalogData.setChannelList(deviceChannelList);
             catalogData.setStatus(CatalogData.CatalogDataStatus.runIng);
             catalogData.setLastTime(Instant.now());
             data.put(deviceId, catalogData);
@@ -84,6 +84,11 @@ public class CatalogDataCatch {
         syncStatus.setCurrent(catalogData.getChannelList().size());
         syncStatus.setTotal(catalogData.getTotal());
         syncStatus.setErrorMsg(catalogData.getErrorMsg());
+        if (catalogData.getStatus().equals(CatalogData.CatalogDataStatus.end)) {
+            syncStatus.setSyncIng(false);
+        }else {
+            syncStatus.setSyncIng(true);
+        }
         return syncStatus;
     }
 

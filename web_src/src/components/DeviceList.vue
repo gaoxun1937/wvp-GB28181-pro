@@ -3,6 +3,8 @@
     <div class="page-header">
       <div class="page-title">设备列表</div>
       <div class="page-header-btn">
+        <el-button icon="el-icon-plus" size="mini" style="margin-right: 1rem;" type="primary" @click="add">添加设备
+        </el-button>
         <el-button icon="el-icon-refresh-right" circle size="mini" :loading="getDeviceListLoading"
                    @click="getDeviceList()"></el-button>
       </div>
@@ -16,7 +18,8 @@
       <el-table-column label="地址" min-width="160" >
         <template slot-scope="scope">
           <div slot="reference" class="name-wrapper">
-            <el-tag size="medium">{{ scope.row.hostAddress }}</el-tag>
+            <el-tag v-if="scope.row.hostAddress" size="medium">{{ scope.row.hostAddress }}</el-tag>
+            <el-tag v-if="!scope.row.hostAddress" size="medium">未知</el-tag>
           </div>
         </template>
       </el-table-column>
@@ -146,24 +149,24 @@ export default {
       this.getDeviceList();
     },
     getDeviceList: function () {
-      let that = this;
       this.getDeviceListLoading = true;
       this.$axios({
         method: 'get',
         url: `/api/device/query/devices`,
         params: {
-          page: that.currentPage,
-          count: that.count
+          page: this.currentPage,
+          count: this.count
         }
-      }).then(function (res) {
-        that.total = res.data.total;
-        that.deviceList = res.data.list;
-        that.getDeviceListLoading = false;
-      }).catch(function (error) {
+      }).then( (res)=> {
+        if (res.data.code === 0) {
+          this.total = res.data.data.total;
+          this.deviceList = res.data.data.list;
+        }
+        this.getDeviceListLoading = false;
+      }).catch( (error)=> {
         console.error(error);
-        that.getDeviceListLoading = false;
+        this.getDeviceListLoading = false;
       });
-
     },
     deleteDevice: function (row) {
       let msg = "确定删除此设备？"
@@ -253,21 +256,6 @@ export default {
       })
       return result;
     },
-    //通知设备上传媒体流
-    sendDevicePush: function (itemData) {
-      // let deviceId = this.currentDevice.deviceId;
-      // let channelId = itemData.channelId;
-      // console.log("通知设备推流1：" + deviceId + " : " + channelId);
-      // let that = this;
-      // this.$axios({
-      // 	method: 'get',
-      // 	url: '/api/play/' + deviceId + '/' + channelId
-      // }).then(function(res) {
-      // 	let ssrc = res.data.ssrc;
-      // 	that.$refs.devicePlayer.play(ssrc,deviceId,channelId);
-      // }).catch(function(e) {
-      // });
-    },
     transportChange: function (row) {
       console.log(`修改传输方式为 ${row.streamMode}：${row.deviceId} `);
       let that = this;
@@ -290,7 +278,20 @@ export default {
         setTimeout(this.getDeviceList, 200)
 
       })
+    },
+    add: function () {
+      this.$refs.deviceEdit.openDialog(null, () => {
+        this.$refs.deviceEdit.close();
+        this.$message({
+          showClose: true,
+          message: "添加成功",
+          type: "success",
+        });
+        setTimeout(this.getDeviceList, 200)
+
+      })
     }
+
 
   }
 };

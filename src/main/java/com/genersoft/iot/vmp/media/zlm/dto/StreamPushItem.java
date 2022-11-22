@@ -1,38 +1,44 @@
 package com.genersoft.iot.vmp.media.zlm.dto;
 
 import com.genersoft.iot.vmp.gb28181.bean.GbStream;
+import com.genersoft.iot.vmp.media.zlm.dto.hook.OnStreamChangedHookParam;
 import com.genersoft.iot.vmp.utils.DateUtil;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.util.unit.DataUnit;
 
 import java.util.List;
 
-
+@Schema(description = "推流信息")
 public class StreamPushItem extends GbStream implements Comparable<StreamPushItem>{
 
     /**
      * id
      */
+    @Schema(description = "id")
     private Integer id;
 
     /**
      * 应用名
      */
+    @Schema(description = "应用名")
     private String app;
 
     /**
      * 流id
      */
+    @Schema(description = "流id")
     private String stream;
 
     /**
      * 观看总人数，包括hls/rtsp/rtmp/http-flv/ws-flv
      */
+    @Schema(description = "观看总人数")
     private String totalReaderCount;
 
     /**
      * 协议 包括hls/rtsp/rtmp/http-flv/ws-flv
      */
+    @Schema(description = "协议 包括hls/rtsp/rtmp/http-flv/ws-flv")
     private List<MediaSchema> schemas;
 
     /**
@@ -46,62 +52,88 @@ public class StreamPushItem extends GbStream implements Comparable<StreamPushIte
      * mp4_vod=6,
      * device_chn=7
      */
+    @Schema(description = "产生源类型")
     private int originType;
 
     /**
      * 客户端和服务器网络信息，可能为null类型
      */
-    private MediaItem.OriginSock originSock;
+    @Schema(description = "客户端和服务器网络信息，可能为null类型")
+    private OnStreamChangedHookParam.OriginSock originSock;
 
     /**
      * 产生源类型的字符串描述
      */
+    @Schema(description = "产生源类型的字符串描述")
     private String originTypeStr;
 
     /**
      * 产生源的url
      */
+    @Schema(description = "产生源的url")
     private String originUrl;
 
     /**
      * 存活时间，单位秒
      */
+    @Schema(description = "存活时间，单位秒")
     private Long aliveSecond;
 
     /**
      * 音视频轨道
      */
-    private List<MediaItem.MediaTrack> tracks;
+    @Schema(description = "音视频轨道")
+    private List<OnStreamChangedHookParam.MediaTrack> tracks;
 
     /**
      * 音视频轨道
      */
+    @Schema(description = "音视频轨道")
     private String vhost;
 
     /**
      * 使用的流媒体ID
      */
+    @Schema(description = "使用的流媒体ID")
     private String mediaServerId;
 
     /**
      * 使用的服务ID
      */
+    @Schema(description = "使用的服务ID")
     private String serverId;
 
     /**
      * 推流时间
      */
+    @Schema(description = "推流时间")
     private String pushTime;
 
     /**
      * 更新时间
      */
+    @Schema(description = "更新时间")
     private String updateTime;
 
     /**
      * 创建时间
      */
+    @Schema(description = "创建时间")
     private String createTime;
+
+    /**
+     * 是否正在推流
+     */
+    @Schema(description = "是否正在推流")
+    private boolean pushIng;
+
+    /**
+     * 是否自己平台的推流
+     */
+    @Schema(description = "是否自己平台的推流")
+    private boolean self;
+
+
 
     public String getVhost() {
         return vhost;
@@ -191,11 +223,11 @@ public class StreamPushItem extends GbStream implements Comparable<StreamPushIte
         this.originType = originType;
     }
 
-    public MediaItem.OriginSock getOriginSock() {
+    public OnStreamChangedHookParam.OriginSock getOriginSock() {
         return originSock;
     }
 
-    public void setOriginSock(MediaItem.OriginSock originSock) {
+    public void setOriginSock(OnStreamChangedHookParam.OriginSock originSock) {
         this.originSock = originSock;
     }
 
@@ -224,11 +256,11 @@ public class StreamPushItem extends GbStream implements Comparable<StreamPushIte
         this.aliveSecond = aliveSecond;
     }
 
-    public List<MediaItem.MediaTrack> getTracks() {
+    public List<OnStreamChangedHookParam.MediaTrack> getTracks() {
         return tracks;
     }
 
-    public void setTracks(List<MediaItem.MediaTrack> tracks) {
+    public void setTracks(List<OnStreamChangedHookParam.MediaTrack> tracks) {
         this.tracks = tracks;
     }
 
@@ -276,6 +308,22 @@ public class StreamPushItem extends GbStream implements Comparable<StreamPushIte
     @Override
     public void setCreateTime(String createTime) {
         this.createTime = createTime;
+    }
+
+    public boolean isPushIng() {
+        return pushIng;
+    }
+
+    public void setPushIng(boolean pushIng) {
+        this.pushIng = pushIng;
+    }
+
+    public boolean isSelf() {
+        return self;
+    }
+
+    public void setSelf(boolean self) {
+        this.self = self;
     }
 }
 

@@ -1,7 +1,9 @@
 <template>
 	<div id="recordDetail">
 		<el-container>
+
       <el-aside width="300px">
+
         <div class="record-list-box-box">
           <el-date-picker size="mini" v-model="chooseDate" :picker-options="pickerOptions" type="date" value-format="yyyy-MM-dd" placeholder="日期" @change="dateChange()"></el-date-picker>
           <div class="record-list-box" :style="recordListStyle">
@@ -15,7 +17,6 @@
                   <i class="el-icon-video-camera"  ></i>
                   {{ item.substring(0,17)}}
                 </el-tag>
-<!--                <a class="el-icon-download" style="color: #409EFF;font-weight: 600;margin-left: 10px;" :href="`${basePath}/${mediaServerId}/record/${recordFile.app}/${recordFile.stream}/${chooseDate}/${item}`" download />-->
                 <a class="el-icon-download" style="color: #409EFF;font-weight: 600;margin-left: 10px;" :href="`${basePath}/download.html?url=record/${recordFile.app}/${recordFile.stream}/${chooseDate}/${item}`" target="_blank" />
               </li>
             </ul>
@@ -250,8 +251,10 @@
             count: that.count
           }
         }).then(function (res) {
-          that.total = res.data.data.total;
-          that.detailFiles = that.detailFiles.concat(res.data.data.list);
+          if (res.data.code === 0) {
+            that.total = res.data.data.total;
+            that.detailFiles = that.detailFiles.concat(res.data.data.list);
+          }
           that.loading = false;
           if (callback) callback();
         }).catch(function (error) {
@@ -320,7 +323,7 @@
             count: that.count
           }
         }).then(function (res) {
-          if (res.data.code == 0) {
+          if (res.data.code === 0) {
             that.total = res.data.data.total;
             that.recordList = res.data.data.list;
           }
@@ -390,7 +393,7 @@
             endTime: moment(this.taskTimeRange[1]).format('YYYY-MM-DD HH:mm:ss'),
           }
         }).then(function (res) {
-          if (res.data.code === 0 && res.data.msg === "success") {
+          if (res.data.code === 0 ) {
             that.showTaskBox = false
             that.getTaskList(false);
           }else {
@@ -412,7 +415,7 @@
             isEnd: isEnd,
           }
         }).then(function (res) {
-          if (res.data.code == 0) {
+          if (res.data.code === 0) {
             if (isEnd){
               that.taskListEnded = res.data.data;
             }else {
@@ -422,6 +425,9 @@
         }).catch(function (error) {
           console.log(error);
         });
+      },
+      goBack(){
+        this.$router.push('/cloudRecord');
       }
 		}
 	};

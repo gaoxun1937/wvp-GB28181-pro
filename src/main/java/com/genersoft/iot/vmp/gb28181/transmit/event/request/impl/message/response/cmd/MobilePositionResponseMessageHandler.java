@@ -1,5 +1,6 @@
 package com.genersoft.iot.vmp.gb28181.transmit.event.request.impl.message.response.cmd;
 
+import com.alibaba.fastjson2.JSONObject;
 import com.genersoft.iot.vmp.conf.UserSetting;
 import com.genersoft.iot.vmp.gb28181.bean.*;
 import com.genersoft.iot.vmp.gb28181.transmit.event.request.SIPRequestProcessorParent;
@@ -7,9 +8,12 @@ import com.genersoft.iot.vmp.gb28181.transmit.event.request.impl.message.IMessag
 import com.genersoft.iot.vmp.gb28181.transmit.event.request.impl.message.response.ResponseMessageHandler;
 import com.genersoft.iot.vmp.gb28181.utils.Coordtransform;
 import com.genersoft.iot.vmp.gb28181.utils.NumericUtil;
+import com.genersoft.iot.vmp.service.IDeviceChannelService;
+import com.genersoft.iot.vmp.storager.IRedisCatchStorage;
 import com.genersoft.iot.vmp.storager.IVideoManagerStorage;
 import com.genersoft.iot.vmp.utils.DateUtil;
 import com.genersoft.iot.vmp.utils.GpsUtil;
+import gov.nist.javax.sip.message.SIPRequest;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
 import org.slf4j.Logger;
@@ -17,7 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
+import org.springframework.util.ObjectUtils;
 
 import javax.sip.InvalidArgumentException;
 import javax.sip.RequestEvent;
@@ -27,6 +31,10 @@ import java.text.ParseException;
 
 import static com.genersoft.iot.vmp.gb28181.utils.XmlUtil.getText;
 
+/**
+ * 移动设备位置数据查询回复
+ * @author lin
+ */
 @Component
 public class MobilePositionResponseMessageHandler extends SIPRequestProcessorParent implements InitializingBean, IMessageHandler {
 
@@ -42,6 +50,12 @@ public class MobilePositionResponseMessageHandler extends SIPRequestProcessorPar
     @Autowired
     private IVideoManagerStorage storager;
 
+    @Autowired
+    private IRedisCatchStorage redisCatchStorage;
+
+    @Autowired
+    private IDeviceChannelService deviceChannelService;
+
     @Override
     public void afterPropertiesSet() throws Exception {
         responseMessageHandler.addHandler(cmdType, this);
@@ -49,13 +63,22 @@ public class MobilePositionResponseMessageHandler extends SIPRequestProcessorPar
 
     @Override
     public void handForDevice(RequestEvent evt, Device device, Element rootElement) {
+        SIPRequest request = (SIPRequest) evt.getRequest();
 
         try {
             rootElement = getRootElement(evt, device.getCharset());
-
+            if (rootElement == null) {
+                logger.warn("[ 移动设备位置数据查询回复 ] content cannot be null, {}", evt.getRequest());
+                try {
+                    responseAck(request, Response.BAD_REQUEST);
+                } catch (SipException | InvalidArgumentException | ParseException e) {
+                    logger.error("[命令发送失败] 移动设备位置数据查询 BAD_REQUEST: {}", e.getMessage());
+                }
+                return;
+            }
             MobilePosition mobilePosition = new MobilePosition();
             mobilePosition.setCreateTime(DateUtil.getNow());
-            if (!StringUtils.isEmpty(device.getName())) {
+            if (!ObjectUtils.isEmpty(device.getName())) {
                 mobilePosition.setDeviceName(device.getName());
             }
             mobilePosition.setDeviceId(device.getDeviceId());
@@ -79,42 +102,46 @@ public class MobilePositionResponseMessageHandler extends SIPRequestProcessorPar
                 mobilePosition.setAltitude(0.0);
             }
             mobilePosition.setReportSource("Mobile Position");
-            if ("WGS84".equals(device.getGeoCoordSys())) {
-                mobilePosition.setLongitudeWgs84(mobilePosition.getLongitude());
-                mobilePosition.setLatitudeWgs84(mobilePosition.getLatitude());
-                Double[] position = Coordtransform.WGS84ToGCJ02(mobilePosition.getLongitude(), mobilePosition.getLatitude());
-                mobilePosition.setLongitudeGcj02(position[0]);
-                mobilePosition.setLatitudeGcj02(position[1]);
-            }else if ("GCJ02".equals(device.getGeoCoordSys())) {
-                mobilePosition.setLongitudeGcj02(mobilePosition.getLongitude());
-                mobilePosition.setLatitudeGcj02(mobilePosition.getLatitude());
-                Double[] position = Coordtransform.GCJ02ToWGS84(mobilePosition.getLongitude(), mobilePosition.getLatitude());
-                mobilePosition.setLongitudeWgs84(position[0]);
-                mobilePosition.setLatitudeWgs84(position[1]);
-            }else {
-                mobilePosition.setLongitudeGcj02(0.00);
-                mobilePosition.setLatitudeGcj02(0.00);
-                mobilePosition.setLongitudeWgs84(0.00);
-                mobilePosition.setLatitudeWgs84(0.00);
-            }
-            if (userSetting.getSavePositionHistory()) {
-                storager.insertMobilePosition(mobilePosition);
-            }
+
             // 更新device channel 的经纬度
             DeviceChannel deviceChannel = new DeviceChannel();
             deviceChannel.setDeviceId(device.getDeviceId());
             deviceChannel.setChannelId(mobilePosition.getChannelId());
             deviceChannel.setLongitude(mobilePosition.getLongitude());
             deviceChannel.setLatitude(mobilePosition.getLatitude());
-            deviceChannel.setLongitudeWgs84(mobilePosition.getLongitudeWgs84());
-            deviceChannel.setLatitudeWgs84(mobilePosition.getLatitudeWgs84());
-            deviceChannel.setLongitudeGcj02(mobilePosition.getLongitudeGcj02());
-            deviceChannel.setLatitudeGcj02(mobilePosition.getLatitudeGcj02());
             deviceChannel.setGpsTime(mobilePosition.getTime());
+
+            deviceChannel = deviceChannelService.updateGps(deviceChannel, device);
+
+            mobilePosition.setLongitudeWgs84(deviceChannel.getLongitudeWgs84());
+            mobilePosition.setLatitudeWgs84(deviceChannel.getLatitudeWgs84());
+            mobilePosition.setLongitudeGcj02(deviceChannel.getLongitudeGcj02());
+            mobilePosition.setLatitudeGcj02(deviceChannel.getLatitudeGcj02());
+
+            if (userSetting.getSavePositionHistory()) {
+                storager.insertMobilePosition(mobilePosition);
+            }
             storager.updateChannelPosition(deviceChannel);
+
+            // 发送redis消息。 通知位置信息的变化
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("time", mobilePosition.getTime());
+            jsonObject.put("serial", deviceChannel.getDeviceId());
+            jsonObject.put("code", deviceChannel.getChannelId());
+            jsonObject.put("longitude", mobilePosition.getLongitude());
+            jsonObject.put("latitude", mobilePosition.getLatitude());
+            jsonObject.put("altitude", mobilePosition.getAltitude());
+            jsonObject.put("direction", mobilePosition.getDirection());
+            jsonObject.put("speed", mobilePosition.getSpeed());
+            redisCatchStorage.sendMobilePositionMsg(jsonObject);
             //回复 200 OK
-            responseAck(evt, Response.OK);
-        } catch (DocumentException | SipException | InvalidArgumentException | ParseException e) {
+            try {
+                responseAck(request, Response.OK);
+            } catch (SipException | InvalidArgumentException | ParseException e) {
+                logger.error("[命令发送失败] 移动设备位置数据查询 200: {}", e.getMessage());
+            }
+
+        } catch (DocumentException e) {
             e.printStackTrace();
         }
     }

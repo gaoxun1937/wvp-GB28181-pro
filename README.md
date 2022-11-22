@@ -1,5 +1,5 @@
 ![logo](https://raw.githubusercontent.com/648540858/wvp-GB28181-pro/wvp-28181-2.0/web_src/static/logo.png)
-# 开箱即用的的28181协议视频平台
+# 开箱即用的28181协议视频平台
 
 [![Build Status](https://travis-ci.org/xia-chu/ZLMediaKit.svg?branch=master)](https://travis-ci.org/xia-chu/ZLMediaKit)
 [![license](http://img.shields.io/badge/license-MIT-green.svg)](https://github.com/xia-chu/ZLMediaKit/blob/master/LICENSE)
@@ -25,7 +25,7 @@ WEB VIDEO PLATFORM是一个基于GB28181-2016标准实现的开箱即用的网�
 旨在打造一个易配置,易使用,便于维护的28181国标信令系统, 依托优秀的开源流媒体服务框架ZLMediaKit, 实现一个完整易用GB28181平台. 
 
 # 部署文档
-[https://github.com/648540858/wvp-GB28181-pro/wiki](https://github.com/648540858/wvp-GB28181-pro/wiki)
+[doc.wvp-pro.cn](https://doc.wvp-pro.cn)
 
 # gitee同步仓库
 https://gitee.com/pan648540858/wvp-GB28181-pro.git
@@ -101,6 +101,7 @@ https://gitee.com/pan648540858/wvp-GB28181-pro.git
     - [X] 目录订阅与通知
     - [X] 录像查看与播放
     - [X] GPS订阅与通知（直播推流）
+- [X] 支持手动添加设备和给设备设置单独的密码
 - [X] 添加RTSP视频
 - [X] 添加接口鉴权
 - [X] 添加RTMP视频
@@ -155,7 +156,6 @@ QQ私信一般不回, 精力有限.欢迎大家在群里讨论.觉得项目对�
 
 # 授权协议
 本项目自有代码使用宽松的MIT协议，在保留版权信息的情况下可以自由应用于各自商用、非商业的项目。 但是本项目也零碎的使用了一些其他的开源代码，在商用的情况下请自行替代或剔除； 由于使用本项目而产生的商业纠纷或侵权行为一概与本项目及开发者无关，请自行承担法律风险。 在使用本项目代码时，也应该在授权协议中同时表明本项目依赖的第三方库的协议
-
 # 致谢
 感谢作者[夏楚](https://github.com/xia-chu) 提供这么棒的开源流媒体服务框架,并在开发过程中给予支持与帮助。     
 感谢作者[dexter langhuihui](https://github.com/langhuihui) 开源这么好用的WEB播放器。     
@@ -165,7 +165,7 @@ QQ私信一般不回, 精力有限.欢迎大家在群里讨论.觉得项目对�
 [hotcoffie](https://github.com/hotcoffie) [xiaomu](https://github.com/nikmu) [TristingChen](https://github.com/TristingChen)
 [chenparty](https://github.com/chenparty) [Hotleave](https://github.com/hotleave) [ydwxb](https://github.com/ydwxb)
 [ydpd](https://github.com/ydpd) [szy833](https://github.com/szy833) [ydwxb](https://github.com/ydwxb) [Albertzhu666](https://github.com/Albertzhu666)
-[mk1990](https://github.com/mk1990)
+[mk1990](https://github.com/mk1990) [SaltFish001](https://github.com/SaltFish001)
 
 ps: 刚增加了这个名单，肯定遗漏了一些大佬，欢迎大佬联系我添加。
 

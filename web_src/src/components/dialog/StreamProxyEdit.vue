@@ -105,7 +105,9 @@
                   <el-checkbox label="启用" v-model="proxyParam.enable" ></el-checkbox>
                   <el-checkbox label="转HLS" v-model="proxyParam.enable_hls" ></el-checkbox>
                   <el-checkbox label="MP4录制" v-model="proxyParam.enable_mp4" ></el-checkbox>
-                  <el-checkbox label="无人观看自动删除" v-model="proxyParam.enable_remove_none_reader" ></el-checkbox>
+                  <el-checkbox label="无人观看自动删除" v-model="proxyParam.enable_remove_none_reader" @change="removeNoneReader"></el-checkbox>
+                  <el-checkbox label="无人观看停止拉流" v-model="proxyParam.enable_disable_none_reader" @change="disableNoneReaderHandType"></el-checkbox>
+
                 </div>
 
               </el-form-item>
@@ -170,6 +172,7 @@ export default {
           enable_hls: true,
           enable_mp4: false,
           enable_remove_none_reader: false,
+          enable_disable_none_reader: true,
           platformGbId: null,
           mediaServerId: null,
       },
@@ -200,7 +203,7 @@ export default {
         method: 'get',
         url:`/api/platform/query/10000/1`
       }).then(function (res) {
-        that.platformList = res.data.list;
+        that.platformList = res.data.data.list;
       }).catch(function (error) {
         console.log(error);
       });
@@ -263,7 +266,7 @@ export default {
       var result = false;
       var that = this;
       await that.$axios({
-        method: 'post',
+        method: 'get',
         url:`/api/platform/exit/${deviceGbId}`
       }).then(function (res) {
         result = res.data;
@@ -276,6 +279,12 @@ export default {
       if (this.platform.enable && this.platform.expires == "0") {
         this.platform.expires = "300";
       }
+    },
+    removeNoneReader: function(checked) {
+      this.proxyParam.enable_disable_none_reader = !checked;
+    },
+    disableNoneReaderHandType: function(checked) {
+      this.proxyParam.enable_remove_none_reader = !checked;
     }
   },
 };

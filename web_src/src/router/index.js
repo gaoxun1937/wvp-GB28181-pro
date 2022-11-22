@@ -2,7 +2,7 @@ import Vue from 'vue'
 import VueRouter from 'vue-router'
 import Layout from "../layout/index.vue"
 
-import control from '../components/control.vue'
+import console from '../components/console.vue'
 import deviceList from '../components/DeviceList.vue'
 import channelList from '../components/channelList.vue'
 import pushVideoList from '../components/PushVideoList.vue'
@@ -17,6 +17,7 @@ import sip from '../components/setting/Sip.vue'
 import media from '../components/setting/Media.vue'
 import live from '../components/live.vue'
 import deviceTree from '../components/common/DeviceTree.vue'
+import userManager from '../components/UserManager.vue'
 
 import wasmPlayer from '../components/common/jessibuca.vue'
 import rtcPlayer from '../components/dialog/rtcPlayer.vue'
@@ -36,11 +37,11 @@ export default new VueRouter({
       path: '/',
       name: 'home',
       component: Layout,
-      redirect: '/control',
+      redirect: '/console',
       children: [
         {
-          path: '/control',
-          component: control,
+          path: '/console',
+          component: console,
         },
         {
           path: '/live',
@@ -103,6 +104,11 @@ export default new VueRouter({
           name: 'map',
           component: map,
         },
+        {
+          path: '/userManager',
+          name: 'userManager',
+          component: userManager,
+        }
         ]
     },
     {

@@ -1,7 +1,7 @@
 package com.genersoft.iot.vmp.media.zlm;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.genersoft.iot.vmp.media.zlm.dto.MediaServerItem;
 import okhttp3.*;
 import okhttp3.logging.HttpLoggingInterceptor;
@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
@@ -49,7 +50,7 @@ public class AssistRESTfulUtils {
         if (mediaServerItem == null) {
             return null;
         }
-        if (StringUtils.isEmpty(mediaServerItem.getRecordAssistPort())) {
+        if (mediaServerItem.getRecordAssistPort() <= 0) {
             logger.warn("未启用Assist服务");
             return null;
         }
@@ -134,6 +135,14 @@ public class AssistRESTfulUtils {
         param.put("stream",stream);
         param.put("recordIng",true);
         return sendGet(mediaServerItem, "api/record/file/duration",param, callback);
+    }
+
+    public JSONObject addStreamCallInfo(MediaServerItem mediaServerItem, String app, String stream, String callId, RequestCallback callback){
+        Map<String, Object> param = new HashMap<>();
+        param.put("app",app);
+        param.put("stream",stream);
+        param.put("callId",callId);
+        return sendGet(mediaServerItem, "api/record/addStreamCallInfo",param, callback);
     }
 
 }

@@ -1,7 +1,7 @@
 package com.genersoft.iot.vmp.media.zlm;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.genersoft.iot.vmp.media.zlm.dto.MediaServerItem;
 import okhttp3.*;
 import okhttp3.logging.HttpLoggingInterceptor;
@@ -22,6 +22,9 @@ import java.util.concurrent.TimeUnit;
 public class ZLMRESTfulUtils {
 
     private final static Logger logger = LoggerFactory.getLogger(ZLMRESTfulUtils.class);
+
+
+
 
     public interface RequestCallback{
         void run(JSONObject response);
@@ -166,7 +169,6 @@ public class ZLMRESTfulUtils {
                     .build();
             Response response = client.newCall(request).execute();
             if (response.isSuccessful()) {
-                logger.info("response body contentType: " + Objects.requireNonNull(response.body()).contentType());
                 if (targetPath != null) {
                     File snapFolder = new File(targetPath);
                     if (!snapFolder.exists()) {
@@ -322,10 +324,22 @@ public class ZLMRESTfulUtils {
     }
 
     public void getSnap(MediaServerItem mediaServerItem, String flvUrl, int timeout_sec, int expire_sec, String targetPath, String fileName) {
-        Map<String, Object> param = new HashMap<>();
+        Map<String, Object> param = new HashMap<>(3);
         param.put("url", flvUrl);
         param.put("timeout_sec", timeout_sec);
         param.put("expire_sec", expire_sec);
         sendGetForImg(mediaServerItem, "getSnap", param, targetPath, fileName);
+    }
+
+    public JSONObject pauseRtpCheck(MediaServerItem mediaServerItem, String streamId) {
+        Map<String, Object> param = new HashMap<>(1);
+        param.put("stream_id", streamId);
+        return sendPost(mediaServerItem, "pauseRtpCheck",param, null);
+    }
+
+    public JSONObject resumeRtpCheck(MediaServerItem mediaServerItem, String streamId) {
+        Map<String, Object> param = new HashMap<>(1);
+        param.put("stream_id", streamId);
+        return sendPost(mediaServerItem, "resumeRtpCheck",param, null);
     }
 }

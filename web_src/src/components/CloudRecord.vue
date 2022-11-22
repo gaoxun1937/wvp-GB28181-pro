@@ -1,7 +1,11 @@
 <template>
 	<div id="app" style="width: 100%">
     <div class="page-header">
-      <div class="page-title">云端录像</div>
+      <div class="page-title">
+        <el-page-header v-if="recordDetail" @back="backToList" content="云端录像"></el-page-header>
+        <div v-if="!recordDetail">云端录像</div>
+      </div>
+
       <div class="page-header-btn">
         节点选择:
         <el-select size="mini" @change="chooseMediaChange" style="width: 16rem; margin-right: 1rem;" v-model="mediaServerId" placeholder="请选择" :disabled="recordDetail">
@@ -105,14 +109,25 @@
           that.mediaServerList = data.data;
           if (that.mediaServerList.length > 0) {
             that.mediaServerId = that.mediaServerList[0].id
-            let port = that.mediaServerList[0].httpPort;
-            if (location.protocol === "https:" && that.mediaServerList[0].httpSSlPort) {
-              port = that.mediaServerList[0].httpSSlPort
-            }
-            that.mediaServerPath = location.protocol + "//" + that.mediaServerList[0].streamIp + ":" + port
+            that.setMediaServerPath(that.mediaServerId);
             that.getRecordList();
           }
         })
+      },
+      setMediaServerPath: function (serverId) {
+        let that = this;
+        let i;
+        for (i = 0; i < that.mediaServerList.length; i++) {
+          if (serverId === that.mediaServerList[i].id) {
+            break;
+          }
+        }
+        let port = that.mediaServerList[i].httpPort;
+        if (location.protocol === "https:" && that.mediaServerList[i].httpSSlPort) {
+          port = that.mediaServerList[i].httpSSlPort
+        }
+        that.mediaServerPath = location.protocol + "//" + that.mediaServerList[i].streamIp + ":" + port
+        console.log(that.mediaServerPath)
       },
       getRecordList: function (){
         let that = this;
@@ -125,8 +140,10 @@
           }
         }).then(function (res) {
           console.log(res)
-          that.total = res.data.data.total;
-          that.recordList = res.data.data.list;
+          if (res.data.code === 0) {
+            that.total = res.data.data.total;
+            that.recordList = res.data.data.list;
+          }
           that.loading = false;
         }).catch(function (error) {
           console.log(error);
@@ -140,6 +157,7 @@
           console.log(val)
           this.total = 0;
           this.recordList = [];
+          this.setMediaServerPath(val);
           this.getRecordList();
       },
       showRecordDetail(row){
@@ -174,12 +192,14 @@
           }
         }).then(function (res) {
           console.log(res)
-          that.total = res.data.data.total;
-          that.recordList = res.data.data.list;
+          if (res.data.code === 0) {
+            that.total = res.data.data.total;
+            that.recordList = res.data.data.list;
+          }
         }).catch(function (error) {
           console.log(error);
         });
-      }
+      },
 
 
 		}

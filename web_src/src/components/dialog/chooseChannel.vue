@@ -8,7 +8,7 @@
             <el-tab-pane label="目录结构" name="catalog">
               <el-container>
                 <el-main v-bind:style="{backgroundColor: '#FFF', maxHeight:  winHeight + 'px'}">
-                  <chooseChannelForCatalog ref="chooseChannelForCatalog" :platformId=platformId :platformName=platformName :defaultCatalogId=defaultCatalogId :catalogIdChange="catalogIdChange" ></chooseChannelForCatalog>
+                  <chooseChannelForCatalog ref="chooseChannelForCatalog" :platformId=platformId :platformDeviceId=platformDeviceId :platformName=platformName :defaultCatalogId=defaultCatalogId :catalogIdChange="catalogIdChange" :treeType=treeType ></chooseChannelForCatalog>
                 </el-main>
               </el-container>
             </el-tab-pane>
@@ -60,24 +60,29 @@ export default {
             tabActiveName: "gbChannel",
             catalogTabActiveName: "catalog",
             platformId: "",
+            platformDeviceId: "",
             catalogId: "",
             catalogName: "",
             currentCatalogId: "",
             platformName: "",
             defaultCatalogId: "",
             showDialog: false,
+            treeType: null,
             chooseData: {},
             winHeight: window.innerHeight - 250,
 
         };
     },
     methods: {
-        openDialog(platformId, platformName, defaultCatalogId, closeCallback) {
+        openDialog(platformId, platformDeviceId, platformName, defaultCatalogId, treeType, closeCallback) {
+            console.log("defaultCatalogId: " + defaultCatalogId)
             this.platformId = platformId
+            this.platformDeviceId = platformDeviceId
             this.platformName = platformName
             this.defaultCatalogId = defaultCatalogId
             this.showDialog = true
             this.closeCallback = closeCallback
+            this.treeType = treeType
         },
         tabClick (tab, event){
 
@@ -99,7 +104,7 @@ export default {
                     channelReduces:  that.chooseData
                 }
             }).then((res)=>{
-                if (res.data == true) {
+              if (res.data.code === 0) {
                     that.$message({
                         showClose: true,
                         message: '保存成功,',

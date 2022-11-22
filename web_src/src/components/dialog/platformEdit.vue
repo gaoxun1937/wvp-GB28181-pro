@@ -37,13 +37,13 @@
               <el-form-item label="本地端口" prop="devicePort">
                 <el-input v-model="platform.devicePort" :disabled="true" type="number"></el-input>
               </el-form-item>
+              <el-form-item label="SIP认证用户名" prop="username">
+                <el-input v-model="platform.username"></el-input>
+              </el-form-item>
             </el-form>
           </el-col>
           <el-col :span="12">
             <el-form ref="platform2" :rules="rules" :model="platform" label-width="160px">
-              <el-form-item label="SIP认证用户名" prop="username">
-                <el-input v-model="platform.username"></el-input>
-              </el-form-item>
               <el-form-item label="行政区划" prop="administrativeDivision">
                 <el-input v-model="platform.administrativeDivision" clearable></el-input>
               </el-form-item>
@@ -78,6 +78,12 @@
                   <el-option label="8" value="8"></el-option>
                 </el-select>
               </el-form-item>
+              <el-form-item label="目录结构" prop="treeType" >
+                <el-select v-model="platform.treeType" style="width: 100%" @change="treeTypeChange">
+                  <el-option key="WGS84" label="行政区划" value="CivilCode"></el-option>
+                  <el-option key="GCJ02" label="业务分组" value="BusinessGroup"></el-option>
+                </el-select>
+              </el-form-item>
               <el-form-item label="字符集" prop="characterSet">
                 <el-select
                   v-model="platform.characterSet"
@@ -91,8 +97,8 @@
               <el-form-item label="其他选项">
                 <el-checkbox label="启用" v-model="platform.enable" @change="checkExpires"></el-checkbox>
                 <el-checkbox label="云台控制" v-model="platform.ptz"></el-checkbox>
-                <el-checkbox label="共享所有直播流" v-model="platform.shareAllLiveStream"></el-checkbox>
                 <el-checkbox label="拉起离线推流" v-model="platform.startOfflinePush"></el-checkbox>
+                <el-checkbox label="RTCP保活" v-model="platform.rtcp" @change="rtcpCheckBoxChange"></el-checkbox>
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" @click="onSubmit">{{
@@ -153,10 +159,10 @@ export default {
         keepTimeout: 60,
         transport: "UDP",
         characterSet: "GB2312",
-        shareAllLiveStream: false,
         startOfflinePush: false,
         catalogGroup: 1,
         administrativeDivision: null,
+        treeType: "BusinessGroup",
       },
       rules: {
         name: [{ required: true, message: "请输入平台名称", trigger: "blur" }],
@@ -189,12 +195,16 @@ export default {
           url:`/api/platform/server_config`
         }).then(function (res) {
           console.log(res);
-          that.platform.deviceGBId = res.data.username;
-          that.platform.deviceIp = res.data.deviceIp;
-          that.platform.devicePort = res.data.devicePort;
-          that.platform.username = res.data.username;
-          that.platform.password = res.data.password;
-          that.platform.administrativeDivision = res.data.username.substr(0, 6);
+          if (res.data.code === 0) {
+            that.platform.deviceGBId = res.data.data.username;
+            that.platform.deviceIp = res.data.data.deviceIp;
+            that.platform.devicePort = res.data.data.devicePort;
+            that.platform.username = res.data.data.username;
+            that.platform.password = res.data.data.password;
+            that.platform.treeType = "BusinessGroup";
+            that.platform.administrativeDivision = res.data.data.username.substr(0, 6);
+          }
+
         }).catch(function (error) {
           console.log(error);
         });
@@ -217,11 +227,11 @@ export default {
         this.platform.keepTimeout = platform.keepTimeout;
         this.platform.transport = platform.transport;
         this.platform.characterSet = platform.characterSet;
-        this.platform.shareAllLiveStream = platform.shareAllLiveStream;
         this.platform.catalogId = platform.catalogId;
         this.platform.startOfflinePush = platform.startOfflinePush;
         this.platform.catalogGroup = platform.catalogGroup;
         this.platform.administrativeDivision = platform.administrativeDivision;
+        this.platform.treeType = platform.treeType;
         this.onSubmit_text = "保存";
         this.saveUrl = "/api/platform/save";
       }
@@ -242,32 +252,34 @@ export default {
 
     },
     onSubmit: function () {
-      var that = this;
-      that.$axios({
+      this.saveForm()
+    },
+    saveForm: function (){
+      this.$axios({
         method: 'post',
         url: this.saveUrl,
-        data: that.platform
-      }).then(function (res) {
-          if (res.data.code === 0) {
-            that.$message({
-              showClose: true,
-              message: "保存成功",
-              type: "success",
-            });
-            that.showDialog = false;
-            if (that.listChangeCallback != null) {
-              that.listChangeCallback();
-            }
-          }else {
-            that.$message({
-              showClose: true,
-              message: res.data.msg,
-              type: "error",
-            });
+        data: this.platform
+      }).then((res) =>{
+        if (res.data.code === 0) {
+          this.$message({
+            showClose: true,
+            message: "保存成功",
+            type: "success",
+          });
+          this.showDialog = false;
+          if (this.listChangeCallback != null) {
+            this.listChangeCallback();
           }
-        }).catch(function (error) {
-          console.log(error);
-        });
+        }else {
+          this.$message({
+            showClose: true,
+            message: res.data.msg,
+            type: "error",
+          });
+        }
+      }).catch((error)=> {
+        console.log(error);
+      });
     },
     close: function () {
       this.showDialog = false;
@@ -293,7 +305,7 @@ export default {
         keepTimeout: 60,
         transport: "UDP",
         characterSet: "GB2312",
-        shareAllLiveStream: false,
+        treeType: "BusinessGroup",
         startOfflinePush: false,
         catalogGroup: 1,
       }
@@ -302,10 +314,12 @@ export default {
       var result = false;
       var that = this;
       await that.$axios({
-                method: 'post',
+                method: 'get',
                 url:`/api/platform/exit/${deviceGbId}`})
         .then(function (res) {
-          result = res.data;
+            if (res.data.code === 0) {
+              result = res.data.data;
+            }
         })
         .catch(function (error) {
           console.log(error);
@@ -316,6 +330,22 @@ export default {
       if (this.platform.enable && this.platform.expires == "0") {
         this.platform.expires = "300";
       }
+    },
+    rtcpCheckBoxChange: function (result){
+      if (result) {
+        this.$message({
+          showClose: true,
+          message: "开启RTCP保活需要上级平台支持，可以避免无效推流",
+          type: "warning",
+        });
+      }
+    },
+    treeTypeChange: function (){
+      this.$message({
+        showClose: true,
+        message: "修改目录结构会导致关联目录与通道数据被清空，保存后生效",
+        type: "warning",
+      });
     }
   },
 };

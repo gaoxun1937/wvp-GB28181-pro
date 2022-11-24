@@ -14,6 +14,8 @@ public class VideoManagerConstants {
 
 	public static final String MEDIA_SERVER_PREFIX = "VMP_MEDIA_SERVER_";
 
+	public static final String MEDIA_SERVER_KEEPALIVE_PREFIX = "VMP_MEDIA_SERVER_KEEPALIVE_";
+
 	public static final String MEDIA_SERVERS_ONLINE_PREFIX = "VMP_MEDIA_ONLINE_SERVERS_";
 
 	public static final String MEDIA_STREAM_PREFIX = "VMP_MEDIA_STREAM";
@@ -30,6 +32,8 @@ public class VideoManagerConstants {
 	// TODO 此处多了一个_，暂不修改
 	public static final String PLAYER_PREFIX = "VMP_PLAYER_";
 	public static final String PLAY_BLACK_PREFIX = "VMP_PLAYBACK_";
+	public static final String PLAY_INFO_PREFIX = "VMP_PLAY_INFO_";
+
 	public static final String DOWNLOAD_PREFIX = "VMP_DOWNLOAD_";
 
 	public static final String PLATFORM_KEEPALIVE_PREFIX = "VMP_PLATFORM_KEEPALIVE_";
@@ -41,6 +45,7 @@ public class VideoManagerConstants {
 	public static final String PLATFORM_REGISTER_INFO_PREFIX = "VMP_PLATFORM_REGISTER_INFO_";
 
 	public static final String PLATFORM_SEND_RTP_INFO_PREFIX = "VMP_PLATFORM_SEND_RTP_INFO_";
+	public static final String DEVICE_PUSH_RTP_INFO_PREFIX = "VMP_DEVICE_PUSH_RTP_INFO_";
 
 	public static final String EVENT_ONLINE_REGISTER = "1";
 

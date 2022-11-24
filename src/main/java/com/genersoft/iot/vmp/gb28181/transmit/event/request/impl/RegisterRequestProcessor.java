@@ -68,7 +68,7 @@ public class RegisterRequestProcessor extends SIPRequestProcessorParent implemen
      * @param evt
      */
     @Override
-    public void process(RequestEvent evt) {
+    public synchronized void process(RequestEvent evt) {
         try {
             RequestEventExt evtExt = (RequestEventExt) evt;
             String requestAddress = evtExt.getRemoteIpAddress() + ":" + evtExt.getRemotePort();

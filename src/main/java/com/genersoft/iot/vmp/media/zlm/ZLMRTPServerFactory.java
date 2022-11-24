@@ -278,7 +278,12 @@ public class ZLMRTPServerFactory {
     public JSONObject startSendRtpStream(MediaServerItem mediaServerItem, Map<String, Object>param) {
         return zlmresTfulUtils.startSendRtp(mediaServerItem, param);
     }
-
+	/**
+     * 调用zlm RESTFUL API —— startSendRtpPassive
+     */
+    public JSONObject startSendRtpPassive(MediaServerItem mediaServerItem, Map<String, Object>param) {
+        return zlmresTfulUtils.startSendRtpPassive(mediaServerItem, param);
+    }
     /**
      * 查询待转推的流是否就绪
      */

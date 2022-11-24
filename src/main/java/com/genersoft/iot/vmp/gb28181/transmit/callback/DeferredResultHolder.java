@@ -1,6 +1,8 @@
 package com.genersoft.iot.vmp.gb28181.transmit.callback;
 
 import com.genersoft.iot.vmp.vmanager.bean.DeferredResultEx;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.context.request.async.DeferredResult;
@@ -10,27 +12,27 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**    
+/**
  * @description: 异步请求处理
  * @author: swwheihei
- * @date:   2020年5月8日 下午7:59:05     
+ * @date:   2020年5月8日 下午7:59:05
  */
 @SuppressWarnings(value = {"rawtypes", "unchecked"})
 @Component
 public class DeferredResultHolder {
-	
+
 	public static final String CALLBACK_CMD_DEVICESTATUS = "CALLBACK_DEVICESTATUS";
-	
+
 	public static final String CALLBACK_CMD_DEVICEINFO = "CALLBACK_DEVICEINFO";
-	
+
 	public static final String CALLBACK_CMD_DEVICECONTROL = "CALLBACK_DEVICECONTROL";
-	
+
 	public static final String CALLBACK_CMD_DEVICECONFIG = "CALLBACK_DEVICECONFIG";
 
 	public static final String CALLBACK_CMD_CONFIGDOWNLOAD = "CALLBACK_CONFIGDOWNLOAD";
-	
+
 	public static final String CALLBACK_CMD_CATALOG = "CALLBACK_CATALOG";
-	
+
 	public static final String CALLBACK_CMD_RECORDINFO = "CALLBACK_RECORDINFO";
 
 	public static final String CALLBACK_CMD_PLAY = "CALLBACK_PLAY";
@@ -71,7 +73,7 @@ public class DeferredResultHolder {
 		}
 		deferredResultMap.put(id, new DeferredResultEx(result));
 	}
-	
+
 	public DeferredResultEx get(String key, String id) {
 		Map<String, DeferredResultEx> deferredResultMap = map.get(key);
 		if (deferredResultMap == null || ObjectUtils.isEmpty(id)) {
@@ -113,7 +115,7 @@ public class DeferredResultHolder {
 		if (result == null) {
 			return;
 		}
-		result.getDeferredResult().setResult(msg.getData());
+		result.getDeferredResult().setResult(new ResponseEntity<>(msg.getData(),msg.getStatus()==null? HttpStatus.OK:msg.getStatus()));
 		deferredResultMap.remove(msg.getId());
 		if (deferredResultMap.size() == 0) {
 			map.remove(msg.getKey());
@@ -144,7 +146,11 @@ public class DeferredResultHolder {
 					Object handler = result.getFilter().handler(msg.getData());
 					result.getDeferredResult().setResult(handler);
 				}else {
-					result.getDeferredResult().setResult(msg.getData());
+					if(msg.getStatus()==HttpStatus.OK) {
+						result.getDeferredResult().setResult(msg.getData());
+					}else{
+						result.getDeferredResult().setErrorResult(new ResponseEntity<>(msg.getData(),msg.getStatus()==null? HttpStatus.OK:msg.getStatus()));
+					}
 				}
 
 			}

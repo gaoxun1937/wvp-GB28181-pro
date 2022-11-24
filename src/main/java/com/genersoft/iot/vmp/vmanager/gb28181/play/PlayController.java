@@ -275,7 +275,7 @@ public class PlayController {
 			resultHolder.invokeResult(msg);
 			return result;
 		}
-		try {
+//		try {
 			cmder.audioBroadcastCmd(device, (event) -> {
 				RequestMessage msg = new RequestMessage();
 				msg.setKey(key);
@@ -288,10 +288,10 @@ public class PlayController {
 				msg.setData(json);
 				resultHolder.invokeResult(msg);
 			});
-		} catch (InvalidArgumentException | SipException | ParseException e) {
-			logger.error("[命令发送失败] 语音广播: {}", e.getMessage());
-			throw new ControllerException(ErrorCode.ERROR100.getCode(), "命令发送失败: " + e.getMessage());
-		}
+//		} catch (InvalidArgumentException | SipException | ParseException e) {
+//			logger.error("[命令发送失败] 语音广播: {}", e.getMessage());
+//			throw new ControllerException(ErrorCode.ERROR100.getCode(), "命令发送失败: " + e.getMessage());
+//		}
 
 		result.onTimeout(() -> {
 			logger.warn("语音广播操作超时, 设备未返回应答指令");

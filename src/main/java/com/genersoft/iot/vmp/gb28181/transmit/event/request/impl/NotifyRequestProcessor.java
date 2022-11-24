@@ -18,6 +18,7 @@ import com.genersoft.iot.vmp.gb28181.utils.XmlUtil;
 import com.genersoft.iot.vmp.service.IDeviceChannelService;
 import com.genersoft.iot.vmp.storager.IRedisCatchStorage;
 import com.genersoft.iot.vmp.storager.IVideoManagerStorage;
+import com.genersoft.iot.vmp.storager.dao.DeviceMapper;
 import com.genersoft.iot.vmp.utils.DateUtil;
 import com.genersoft.iot.vmp.utils.redis.RedisUtil;
 import gov.nist.javax.sip.message.SIPRequest;
@@ -77,6 +78,9 @@ public class NotifyRequestProcessor extends SIPRequestProcessorParent implements
 	@Autowired
 	private IDeviceChannelService deviceChannelService;
 
+	@Autowired
+	private DeviceMapper deviceMapper;
+
 	private boolean taskQueueHandlerRun = false;
 
 	private ConcurrentLinkedQueue<HandlerCatchData> taskQueue = new ConcurrentLinkedQueue<>();
@@ -135,7 +139,7 @@ public class NotifyRequestProcessor extends SIPRequestProcessorParent implements
 
 	/**
 	 * 处理MobilePosition移动位置Notify
-	 * 
+	 *
 	 * @param evt
 	 */
 	private void processNotifyMobilePosition(RequestEvent evt) {
@@ -224,7 +228,7 @@ public class NotifyRequestProcessor extends SIPRequestProcessorParent implements
 
 	/***
 	 * 处理alarm设备报警Notify
-	 * 
+	 *
 	 * @param evt
 	 */
 	private void processNotifyAlarm(RequestEvent evt) {
@@ -334,7 +338,7 @@ public class NotifyRequestProcessor extends SIPRequestProcessorParent implements
 
 	/***
 	 * 处理catalog设备目录列表Notify
-	 * 
+	 *
 	 * @param evt
 	 */
 	private void processNotifyCatalogList(RequestEvent evt) {
@@ -373,6 +377,16 @@ public class NotifyRequestProcessor extends SIPRequestProcessorParent implements
 						event = CatalogEvent.ADD;
 					}else {
 						event = eventElement.getText().toUpperCase();
+					}
+					Element channelModelElement = itemDevice.element("Model");
+					if(channelModelElement.getText().equalsIgnoreCase("AudioOut")){
+						logger.info("音频通道");
+						//音频输出通道，不需要新增通道列表
+						Element channdelIdElement = itemDevice.element("DeviceID");
+						String channelId = channdelIdElement.getTextTrim();
+						device.setBroadcastChannel(channelId);
+						deviceMapper.update(device);
+						continue;
 					}
 					DeviceChannel channel = XmlUtil.channelContentHander(itemDevice, device, event);
 					channel.setDeviceId(device.getDeviceId());

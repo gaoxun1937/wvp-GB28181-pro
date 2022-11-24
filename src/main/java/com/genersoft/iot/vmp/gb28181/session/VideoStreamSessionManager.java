@@ -27,7 +27,8 @@ public class VideoStreamSessionManager {
 	public enum SessionType {
 		play,
 		playback,
-		download
+		download,
+		broadcast
 	}
 
 	/**

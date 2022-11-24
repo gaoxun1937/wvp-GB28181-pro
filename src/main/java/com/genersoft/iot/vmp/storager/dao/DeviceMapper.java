@@ -41,6 +41,7 @@ public interface DeviceMapper {
             "ssrcCheck," +
             "geoCoordSys," +
             "treeType," +
+            "broadcastChannel," +
             "online" +
             " FROM device WHERE deviceId = #{deviceId}")
     Device getDeviceByDeviceId(String deviceId);
@@ -71,6 +72,7 @@ public interface DeviceMapper {
                 "ssrcCheck," +
                 "geoCoordSys," +
                 "treeType," +
+                "broadcastChannel," +
                 "online" +
             ") VALUES (" +
                 "#{deviceId}," +
@@ -98,6 +100,7 @@ public interface DeviceMapper {
                 "#{ssrcCheck}," +
                 "#{geoCoordSys}," +
                 "#{treeType}," +
+                "#{broadcastChannel}," +
                 "#{online}" +
             ")")
     int add(Device device);
@@ -118,6 +121,7 @@ public interface DeviceMapper {
                 "<if test=\"registerTime != null\">, registerTime='${registerTime}'</if>" +
                 "<if test=\"keepaliveTime != null\">, keepaliveTime='${keepaliveTime}'</if>" +
                 "<if test=\"expires != null\">, expires=${expires}</if>" +
+                "<if test=\"broadcastChannel != null\">, broadcastChannel=#{broadcastChannel}</if>" +
                 "WHERE deviceId='${deviceId}'"+
             " </script>"})
     int update(Device device);
@@ -149,6 +153,7 @@ public interface DeviceMapper {
             "ssrcCheck," +
             "geoCoordSys," +
             "treeType," +
+            "broadcastChannel," +
             "online," +
             "(SELECT count(0) FROM device_channel WHERE deviceId=de.deviceId) as channelCount  FROM device de")
     List<Device> getDevices();
@@ -186,6 +191,7 @@ public interface DeviceMapper {
             "ssrcCheck," +
             "geoCoordSys," +
             "treeType," +
+            "broadcastChannel," +
             "online " +
             " FROM device WHERE online = 1")
     List<Device> getOnlineDevices();
@@ -216,6 +222,7 @@ public interface DeviceMapper {
             "ssrcCheck," +
             "geoCoordSys," +
             "treeType," +
+            "broadcastChannel," +
             "online" +
             " FROM device WHERE ip = #{host} AND port=${port}")
     Device getDeviceByHostAndPort(String host, int port);
@@ -238,6 +245,7 @@ public interface DeviceMapper {
             "<if test=\"geoCoordSys != null\">, geoCoordSys=#{geoCoordSys}</if>" +
             "<if test=\"treeType != null\">, treeType=#{treeType}</if>" +
             "<if test=\"mediaServerId != null\">, mediaServerId=#{mediaServerId}</if>" +
+			"<if test=\"broadcastChannel != null\">, broadcastChannel=#{broadcastChannel}</if>" +
             "WHERE deviceId='${deviceId}'"+
             " </script>"})
     int updateCustom(Device device);

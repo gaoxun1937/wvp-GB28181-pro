@@ -8,6 +8,8 @@ import com.genersoft.iot.vmp.conf.exception.SsrcTransactionNotFoundException;
 import com.genersoft.iot.vmp.gb28181.bean.*;
 import com.genersoft.iot.vmp.gb28181.event.EventPublisher;
 import com.genersoft.iot.vmp.gb28181.session.VideoStreamSessionManager;
+import com.genersoft.iot.vmp.gb28181.transmit.callback.DeferredResultHolder;
+import com.genersoft.iot.vmp.gb28181.transmit.callback.RequestMessage;
 import com.genersoft.iot.vmp.gb28181.transmit.cmd.impl.SIPCommander;
 import com.genersoft.iot.vmp.gb28181.transmit.cmd.impl.SIPCommanderFroPlatform;
 import com.genersoft.iot.vmp.media.zlm.dto.HookType;
@@ -22,22 +24,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.async.DeferredResult;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.sip.InvalidArgumentException;
 import javax.sip.SipException;
 import java.text.ParseException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-/**    
+/**
  * @description:针对 ZLMediaServer的hook事件监听
  * @author: swwheihei
- * @date:   2020年5月8日 上午10:46:48     
+ * @date:   2020年5月8日 上午10:46:48
  */
 @RestController
 @RequestMapping("/index/hook")
@@ -100,6 +103,10 @@ public class ZLMHttpHookListener {
 	@Autowired
 	private ThreadPoolTaskExecutor taskExecutor;
 
+	@Autowired
+	private IFlowReportService flowReportService;
+	@Autowired
+	private DeferredResultHolder resultHolder;
 	/**
 	 * 服务器定时上报时间，上报间隔可配置，默认10s上报一次
 	 *
@@ -127,10 +134,42 @@ public class ZLMHttpHookListener {
 
 		return ret;
 	}
-	
+	/**
+	 * 流量统计事件，播放器或推流器断开时并且耗用流量超过特定阈值时会触发此事件，阈值通过配置文件general.flowThreshold配置；此事件对回复不敏感。
+	 *
+	 */
+	@ResponseBody
+	@PostMapping(value = "/on_flow_report", produces = "application/json;charset=UTF-8")
+	public ResponseEntity<String> onFlowReport(@RequestBody JSONObject json){
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("[ ZLM HOOK ]on_flow_report API调用，参数：" + json.toString());
+		}else {
+			logger.debug("[ ZLM HOOK ]on_flow_report API调用，参数：" + json.toString());
+		}
+		FlowReport flowReport = new FlowReport();
+		flowReport.setApp(json.getString("app"));
+		flowReport.setDuration(json.getInteger("duration"));
+		flowReport.setParams(json.getString("params"));
+		flowReport.setPlayer(json.getBoolean("player").toString());
+		flowReport.setSchemaName(json.getString("schema"));
+		flowReport.setStream(json.getString("stream"));
+		flowReport.setTotalBytes(json.getLong("totalBytes"));
+		flowReport.setVhost(json.getString("vhost"));
+		flowReport.setIp(json.getString("ip"));
+		flowReport.setPort(json.getInteger("port"));
+		flowReport.setTcpId(json.getString("tcpId"));
+		flowReport.setMediaServiceId(json.getString("mediaServerId"));
+		flowReport.setCreateDate(new Date());
+		flowReportService.add(flowReport);
+		JSONObject ret = new JSONObject();
+		ret.put("code", 0);
+		ret.put("msg", "success");
+		return new ResponseEntity<String>(ret.toString(), HttpStatus.OK);
+	}
 	/**
 	 * 播放器鉴权事件，rtsp/rtmp/http-flv/ws-flv/hls的播放都将触发此鉴权事件。
-	 *  
+	 *
 	 */
 	@ResponseBody
 	@PostMapping(value = "/on_play", produces = "application/json;charset=UTF-8")
@@ -165,10 +204,10 @@ public class ZLMHttpHookListener {
 		ret.put("msg", "success");
 		return ret;
 	}
-	
+
 	/**
 	 * rtsp/rtmp/rtp推流鉴权事件。
-	 *  
+	 *
 	 */
 	@ResponseBody
 	@PostMapping(value = "/on_publish", produces = "application/json;charset=UTF-8")
@@ -265,10 +304,10 @@ public class ZLMHttpHookListener {
 		}
 		return ret;
 	}
-	
+
 	/**
 	 * rtsp/rtmp流注册或注销时触发此事件；此事件对回复不敏感。
-	 *  
+	 *
 	 */
 	@ResponseBody
 	@PostMapping(value = "/on_stream_changed", produces = "application/json;charset=UTF-8")
@@ -315,6 +354,19 @@ public class ZLMHttpHookListener {
 					mediaServerService.addCount(param.getMediaServerId());
 				}else {
 					mediaServerService.removeCount(param.getMediaServerId());
+					//判断语音广播下发bye关闭广播
+					if("broadcast".equals(param.getApp())){
+						JSONObject hookJson = new JSONObject();
+						hookJson.put("app",param.getApp());
+						hookJson.put("stream",param.getStream());
+						subscribe = this.subscribe.sendNotify(HookType.on_broadcast_changed, hookJson);
+						if (subscribe != null ) {
+							MediaServerItem mediaInfo = mediaServerService.getOne(param.getMediaServerId());
+							if (mediaInfo != null) {
+								subscribe.response(mediaInfo, hookJson);
+							}
+						}
+					}
 				}
 				if (param.getOriginType() == OriginType.PULL.ordinal()
 						|| param.getOriginType() == OriginType.FFMPEG_PULL.ordinal()) {
@@ -411,10 +463,10 @@ public class ZLMHttpHookListener {
 		ret.put("msg", "success");
 		return ret;
 	}
-	
+
 	/**
 	 * 流无人观看时事件，用户可以通过此事件选择是否关闭无人看的流。
-	 *  
+	 *
 	 */
 	@ResponseBody
 	@PostMapping(value = "/on_stream_none_reader", produces = "application/json;charset=UTF-8")
@@ -518,10 +570,10 @@ public class ZLMHttpHookListener {
 		}
 		return ret;
 	}
-	
+
 	/**
 	 * 流未找到事件，用户可以在此事件触发时，立即去拉流，这样可以实现按需拉流；此事件对回复不敏感。
-	 *  
+	 *
 	 */
 	@ResponseBody
 	@PostMapping(value = "/on_stream_not_found", produces = "application/json;charset=UTF-8")
@@ -558,10 +610,74 @@ public class ZLMHttpHookListener {
 		ret.put("msg", "success");
 		return ret;
 	}
-	
 	/**
 	 * 服务器启动事件，可以用于监听服务器崩溃重启；此事件对回复不敏感。
-	 *  
+	 *
+	 */
+	@ResponseBody
+	@PostMapping(value = "/on_broadcast_push", produces = "application/json;charset=UTF-8")
+	public DeferredResult<ResponseEntity<String>> onBroadcastPush(HttpServletRequest request, @RequestBody JSONObject jsonObject){
+		logger.debug("[ ZLM HOOK ]on_broadcast_push API调用，参数：" + jsonObject.toString());
+		DeferredResult<ResponseEntity<String>> result = new DeferredResult<ResponseEntity<String>>(10 * 1000L);
+		if(!jsonObject.containsKey("stream")){
+			result.setResult(new ResponseEntity<>("流不存在",HttpStatus.BAD_REQUEST));
+			return result;
+		}
+		String stream = jsonObject.getString("stream");
+		if(org.apache.commons.lang3.StringUtils.isBlank(stream)){
+			result.setResult(new ResponseEntity<>("流不存在",HttpStatus.BAD_REQUEST));
+			return result;
+		}
+		String device_channel[] = stream.split("_");
+		String deviceId = device_channel[0];
+//		String channelId = device_channel[1];
+		Device device = storager.queryVideoDevice(deviceId);
+		if (device == null) {
+			result.setResult(new ResponseEntity<>("设备不存在",HttpStatus.BAD_REQUEST));
+			return result;
+		}
+		if(org.apache.commons.lang3.StringUtils.isBlank(device.getBroadcastChannel())){
+			result.setResult(new ResponseEntity<>("无语音设备",HttpStatus.BAD_REQUEST));
+			return result;
+		}
+		String key  = DeferredResultHolder.CALLBACK_CMD_BROADCAST+"_" + deviceId+"_"+device.getBroadcastChannel();
+		System.out.println(key);
+		String uuid  = UUID.randomUUID().toString();
+		cmder.audioBroadcastCmd(device,(event -> {
+			RequestMessage msg = new RequestMessage();
+			msg.setKey(key);
+			msg.setId(uuid);
+			JSONObject json = new JSONObject();
+			json.put("DeviceID", deviceId);
+			json.put("CmdType", "Broadcast");
+			json.put("Result", "Failed");
+			json.put("Description", String.format("语音广播操作失败，错误码： %s, %s", event.statusCode, event.msg));
+			logger.error(json.toJSONString());
+			msg.setData(json);
+			msg.setStatus(HttpStatus.BAD_REQUEST);
+			resultHolder.invokeResult(msg);
+		}));
+		result.onTimeout(()->{
+			logger.warn(String.format("语音广播操作超时, 设备未返回应答指令"));
+			RequestMessage msg = new RequestMessage();
+			msg.setKey(key);
+			msg.setId(uuid);
+			JSONObject json = new JSONObject();
+			json.put("DeviceID", deviceId);
+			json.put("CmdType", "Broadcast");
+			json.put("Result", "Failed");
+			json.put("Error", "Timeout. Device did not response to broadcast command.");
+			msg.setData(json);
+			logger.error(json.toJSONString());
+			msg.setStatus(HttpStatus.REQUEST_TIMEOUT);
+			resultHolder.invokeResult(msg);
+		});
+		resultHolder.put(key, uuid, result);
+		return result;
+	}
+	/**
+	 * 服务器启动事件，可以用于监听服务器崩溃重启；此事件对回复不敏感。
+	 *
 	 */
 	@ResponseBody
 	@PostMapping(value = "/on_server_started", produces = "application/json;charset=UTF-8")

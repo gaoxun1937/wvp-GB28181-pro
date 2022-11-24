@@ -378,7 +378,13 @@ public class RedisCatchStorageImpl implements IRedisCatchStorage {
                 + sendRtpItem.getCallId();
         RedisUtil.set(key, sendRtpItem);
     }
-
+	 @Override
+    public void updatePushRTPSever(SendRtpItem sendRtpItem) {
+        String key = VideoManagerConstants.DEVICE_PUSH_RTP_INFO_PREFIX + userSetting.getServerId() + "_"
+                + sendRtpItem.getPlatformId() + "_" + sendRtpItem.getChannelId() + "_"
+                + sendRtpItem.getStreamId() + "_" + sendRtpItem.getCallId();
+         RedisUtil.set(key, sendRtpItem);
+    }
     @Override
     public SendRtpItem querySendRTPServer(String platformGbId, String channelId, String streamId, String callId) {
         if (platformGbId == null) {
@@ -450,6 +456,29 @@ public class RedisCatchStorageImpl implements IRedisCatchStorage {
         }
         return result;
     }
+	@Override
+    public SendRtpItem queryPushRTPServer(String platformGbId, String channelId, String streamId, String callId) {
+        if (platformGbId == null) {
+            platformGbId = "*";
+        }
+        if (channelId == null) {
+            channelId = "*";
+        }
+        if (streamId == null) {
+            streamId = "*";
+        }
+        if (callId == null) {
+            callId = "*";
+        }
+        String key = VideoManagerConstants.DEVICE_PUSH_RTP_INFO_PREFIX + userSetting.getServerId() + "_" + platformGbId
+                + "_" + channelId + "_" + streamId + "_" + callId;
+        List<Object> scan = RedisUtil.scan(key);
+        if (scan.size() > 0) {
+            return (SendRtpItem)RedisUtil.get((String)scan.get(0));
+        }else {
+            return null;
+        }
+    }
 
     @Override
     public List<SendRtpItem> querySendRTPServer(String platformGbId) {
@@ -511,7 +540,28 @@ public class RedisCatchStorageImpl implements IRedisCatchStorage {
 
         return result;
     }
-
+	/**
+     * 删除RTP推送信息缓存
+     * @param platformGbId
+     * @param channelId
+     */
+    @Override
+    public void deletePushRTPServer(String platformGbId, String channelId, String callId, String streamId) {
+        if (streamId == null) {
+            streamId = "*";
+        }
+        if (callId == null) {
+            callId = "*";
+        }
+        String key = VideoManagerConstants.DEVICE_PUSH_RTP_INFO_PREFIX + userSetting.getServerId() + "_" + platformGbId
+                + "_" + channelId + "_" + streamId + "_" + callId;
+        List<Object> scan = RedisUtil.scan(key);
+        if (scan.size() > 0) {
+            for (Object keyStr : scan) {
+                RedisUtil.del((String)keyStr);
+            }
+        }
+    }
     /**
      * 查询某个通道是否存在上级点播（RTP推送）
      * @param channelId

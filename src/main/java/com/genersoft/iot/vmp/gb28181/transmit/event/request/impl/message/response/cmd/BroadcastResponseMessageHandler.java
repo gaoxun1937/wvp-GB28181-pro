@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import javax.sip.InvalidArgumentException;
@@ -46,9 +47,8 @@ public class BroadcastResponseMessageHandler extends SIPRequestProcessorParent i
     public void handForDevice(RequestEvent evt, Device device, Element rootElement) {
         try {
             String channelId = getText(rootElement, "DeviceID");
-            String key = DeferredResultHolder.CALLBACK_CMD_BROADCAST + device.getDeviceId() + channelId;
-            // 回复200 OK
-            responseAck((SIPRequest) evt.getRequest(), Response.OK);
+            String key = DeferredResultHolder.CALLBACK_CMD_BROADCAST+"_" + device.getDeviceId() +"_"+ channelId;
+            System.out.println(key);
             // 此处是对本平台发出Broadcast指令的应答
             JSONObject json = new JSONObject();
             XmlUtil.node2Json(rootElement, json);
@@ -58,8 +58,15 @@ public class BroadcastResponseMessageHandler extends SIPRequestProcessorParent i
             RequestMessage msg = new RequestMessage();
             msg.setKey(key);
             msg.setData(json);
+            if("ERROR".equals(json.getString("Result"))){
+                if(json.containsKey("Info")) {
+                    msg.setData(json.getJSONObject("Info").getString("Reason"));
+                }
+                msg.setStatus(HttpStatus.BAD_REQUEST);
+            }
             deferredResultHolder.invokeAllResult(msg);
-
+			// 回复200 OK
+            responseAck((SIPRequest) evt.getRequest(), Response.OK);
 
         } catch (ParseException | SipException | InvalidArgumentException e) {
             logger.error("[命令发送失败] 国标级联 语音喊话: {}", e.getMessage());

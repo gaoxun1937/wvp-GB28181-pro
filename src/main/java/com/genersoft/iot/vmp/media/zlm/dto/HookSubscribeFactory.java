@@ -41,4 +41,13 @@ public class HookSubscribeFactory {
 
         return hookSubscribe;
     }
+    public static HookSubscribeForServerStarted on_broadcast(String app,String stream) {
+        HookSubscribeForServerStarted hookSubscribe = new HookSubscribeForServerStarted();
+        JSONObject subscribeKey = new com.alibaba.fastjson2.JSONObject();
+        subscribeKey.put("app", app);
+        subscribeKey.put("stream", stream);
+        hookSubscribe.setContent(subscribeKey);
+
+        return hookSubscribe;
+    }
 }

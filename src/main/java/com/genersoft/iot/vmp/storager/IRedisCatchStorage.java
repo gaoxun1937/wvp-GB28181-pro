@@ -78,7 +78,7 @@ public interface IRedisCatchStorage {
     void cleanPlatformRegisterInfos();
 
     void updateSendRTPSever(SendRtpItem sendRtpItem);
-
+    void updatePushRTPSever(SendRtpItem sendRtpItem);
     /**
      * 查询RTP推送信息缓存
      * @param platformGbId
@@ -86,6 +86,13 @@ public interface IRedisCatchStorage {
      * @return sendRtpItem
      */
     SendRtpItem querySendRTPServer(String platformGbId, String channelId, String streamId, String callId);
+    /**
+     * 查询RTP推送信息缓存
+     * @param platformGbId
+     * @param channelId
+     * @return sendRtpItem
+     */
+    SendRtpItem queryPushRTPServer(String platformGbId, String channelId, String streamId, String callId);
 
     List<SendRtpItem> querySendRTPServer(String platformGbId);
 
@@ -95,6 +102,7 @@ public interface IRedisCatchStorage {
      * @param channelId
      */
     void deleteSendRTPServer(String platformGbId, String channelId, String callId, String streamId);
+    void deletePushRTPServer(String platformGbId, String channelId, String callId, String streamId);
 
     /**
      * 查询某个通道是否存在上级点播（RTP推送）

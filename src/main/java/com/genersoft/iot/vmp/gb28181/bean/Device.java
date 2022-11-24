@@ -171,6 +171,8 @@ public class Device {
 	 */
 	@Schema(description = "树类型 国标规定了两种树的展现方式 行政区划：CivilCode 和业务分组:BusinessGroup")
 	private String treeType;
+	//语音通道
+	private String broadcastChannel;
 
 	@Schema(description = "密码")
 	private String password;
@@ -389,7 +391,14 @@ public class Device {
 	public void setTreeType(String treeType) {
 		this.treeType = treeType;
 	}
+	public String getBroadcastChannel() {
+		return broadcastChannel;
+	}
 
+	public void setBroadcastChannel(String broadcastChannel) {
+		this.broadcastChannel = broadcastChannel;
+	}
+	
 	public String getPassword() {
 		return password;
 	}

@@ -87,6 +87,10 @@ public class DeviceInfoResponseMessageHandler extends SIPRequestProcessorParent 
             if (ObjectUtils.isEmpty(device.getStreamMode())) {
                 device.setStreamMode("UDP");
             }
+			//如果是tp-link品牌的摄像头，语音对讲通道和视频通道是同一个
+            if(device.getManufacturer().toUpperCase().contains("TP-LINK")){
+                device.setBroadcastChannel(channelId);
+            }
             deviceService.updateDevice(device);
 
             RequestMessage msg = new RequestMessage();

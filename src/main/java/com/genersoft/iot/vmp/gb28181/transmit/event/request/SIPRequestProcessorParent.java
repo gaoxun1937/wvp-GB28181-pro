@@ -1,11 +1,14 @@
 package com.genersoft.iot.vmp.gb28181.transmit.event.request;
 
+import com.genersoft.iot.vmp.gb28181.SipLayer;
 import com.genersoft.iot.vmp.gb28181.bean.ParentPlatform;
 import com.genersoft.iot.vmp.gb28181.transmit.SIPSender;
 import com.genersoft.iot.vmp.gb28181.utils.SipUtils;
 import gov.nist.javax.sip.SipProviderImpl;
+import gov.nist.javax.sip.SipStackImpl;
 import gov.nist.javax.sip.message.SIPRequest;
 import gov.nist.javax.sip.message.SIPResponse;
+import gov.nist.javax.sip.stack.SIPServerTransaction;
 import org.apache.commons.lang3.ArrayUtils;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -32,10 +35,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**    
+/**
  * @description:处理接收IPCamera发来的SIP协议请求消息
  * @author: songww
- * @date:   2020年5月3日 下午4:42:22     
+ * @date:   2020年5月3日 下午4:42:22
  */
 public abstract class SIPRequestProcessorParent {
 
@@ -43,7 +46,48 @@ public abstract class SIPRequestProcessorParent {
 
 	@Autowired
 	private SIPSender sipSender;
+	@Autowired
+	private SipLayer sipLayer;
+	/**
+	 * 根据 RequestEvent 获取 ServerTransaction
+	 * @param evt
+	 * @return
+	 */
+	public ServerTransaction getServerTransaction(SIPRequest request) {
+		ServerTransaction serverTransaction = (ServerTransaction)request.getTransaction();
+		// 判断TCP还是UDP
+		boolean isTcp = false;
+		ViaHeader reqViaHeader = (ViaHeader) request.getHeader(ViaHeader.NAME);
+		String transport = reqViaHeader.getTransport();
+		if (transport.equals("TCP")) {
+			isTcp = true;
+		}
 
+		if (serverTransaction == null) {
+			try {
+				if (isTcp) {
+					SipProviderImpl tcpSipProvider = sipLayer.getTcpSipProvider();
+					SipStackImpl stack = (SipStackImpl)sipLayer.getTcpSipProvider().getSipStack();
+					serverTransaction = (SIPServerTransaction) stack.findTransaction((SIPRequest)request, true);
+					if (serverTransaction == null) {
+						serverTransaction = tcpSipProvider.getNewServerTransaction(request);
+					}
+				} else {
+					SipProviderImpl udpSipProvider = sipLayer.getUdpSipProvider();
+					SipStackImpl stack = (SipStackImpl)udpSipProvider.getSipStack();
+					serverTransaction = (SIPServerTransaction) stack.findTransaction((SIPRequest)request, true);
+					if (serverTransaction == null) {
+						serverTransaction = udpSipProvider.getNewServerTransaction(request);
+					}
+				}
+			} catch (TransactionAlreadyExistsException e) {
+				logger.error(e.getMessage());
+			} catch (TransactionUnavailableException e) {
+				logger.error(e.getMessage());
+			}
+		}
+		return serverTransaction;
+	}
 	public AddressFactory getAddressFactory() {
 		try {
 			return SipFactory.getInstance().createAddressFactory();
@@ -181,7 +225,14 @@ public abstract class SIPRequestProcessorParent {
 
 		return response;
 	}
-
+//	public void responseTrying(RequestEvent evt) throws ParseException, InvalidArgumentException, SipException {
+//		Response response = getMessageFactory().createResponse(Response.TRYING, evt.getRequest());
+//		ServerTransaction serverTransaction = getServerTransaction(evt);
+//		if (serverTransaction == null) {
+//			logger.warn("回复失败：{}", response);
+//			return;
+//		}
+//	}
 	/**
 	 * 回复带sdp的200
 	 */

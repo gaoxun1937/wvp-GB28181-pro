@@ -14,6 +14,7 @@ import com.genersoft.iot.vmp.gb28181.utils.NumericUtil;
 import com.genersoft.iot.vmp.gb28181.utils.XmlUtil;
 import com.genersoft.iot.vmp.storager.IRedisCatchStorage;
 import com.genersoft.iot.vmp.storager.IVideoManagerStorage;
+import com.genersoft.iot.vmp.storager.dao.DeviceMapper;
 import gov.nist.javax.sip.message.SIPRequest;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -61,6 +62,8 @@ public class CatalogResponseMessageHandler extends SIPRequestProcessorParent imp
     @Qualifier("taskExecutor")
     @Autowired
     private ThreadPoolTaskExecutor taskExecutor;
+    @Autowired
+    private DeviceMapper deviceMapper;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -111,8 +114,18 @@ public class CatalogResponseMessageHandler extends SIPRequestProcessorParent imp
                                 Element itemDevice = deviceListIterator.next();
                                 Element channelDeviceElement = itemDevice.element("DeviceID");
                                 if (channelDeviceElement == null) {
-                                    continue;
-                                }
+                                        continue;
+                                    }
+                                    Element channelModelElement = itemDevice.element("Model");
+                                    if(channelModelElement.getText().equalsIgnoreCase("AudioOut")){
+                                        sumNum--;
+                                        //音频输出通道，不需要新增通道列表
+                                        Element channdelIdElement = itemDevice.element("DeviceID");
+                                        String channelId = channdelIdElement.getTextTrim();
+                                        device.setBroadcastChannel(channelId);
+                                        deviceMapper.update(device);
+                                        continue;
+                                    }
                                 DeviceChannel deviceChannel = XmlUtil.channelContentHander(itemDevice, device, null);
                                 deviceChannel.setDeviceId(take.getDevice().getDeviceId());
 

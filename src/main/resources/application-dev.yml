@@ -95,3 +95,4 @@ user-settings:
     # 推流直播是否录制
     record-push-live: false
     auto-apply-play: false
+    record-sip: false

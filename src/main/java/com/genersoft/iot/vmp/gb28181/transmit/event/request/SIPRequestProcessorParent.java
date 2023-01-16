@@ -17,19 +17,17 @@ import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 
 import javax.sip.*;
 import javax.sip.address.Address;
-import javax.sip.address.AddressFactory;
 import javax.sip.address.SipURI;
-import javax.sip.header.*;
+import javax.sip.header.ContentTypeHeader;
+import javax.sip.header.ExpiresHeader;
+import javax.sip.header.HeaderFactory;
 import javax.sip.message.MessageFactory;
 import javax.sip.message.Request;
 import javax.sip.message.Response;
 import java.io.ByteArrayInputStream;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -96,7 +94,6 @@ public abstract class SIPRequestProcessorParent {
 		}
 		return null;
 	}
-
 	public HeaderFactory getHeaderFactory() {
 		try {
 			return SipFactory.getInstance().createHeaderFactory();

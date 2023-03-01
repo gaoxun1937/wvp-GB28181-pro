@@ -266,4 +266,7 @@ public interface IRedisCatchStorage {
 
     List<SendRtpItem> queryAllSendRTPServer();
 
+    List<Device> getAllDevices();
+
+    void removeAllDevice();
 }

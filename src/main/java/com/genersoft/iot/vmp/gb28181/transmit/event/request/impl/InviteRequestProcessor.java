@@ -324,7 +324,7 @@ public class InviteRequestProcessor extends SIPRequestProcessorParent implements
                     return;
                 }
                 String username = sdp.getOrigin().getUsername();
-                String addressStr = sdp.getOrigin().getAddress();
+                String addressStr = sdp.getConnection().getAddress();
 
                 logger.info("[上级点播]用户：{}， 通道：{}, 地址：{}:{}， ssrc：{}", username, channelId, addressStr, port, ssrc);
                 Device device = null;
@@ -979,7 +979,11 @@ public class InviteRequestProcessor extends SIPRequestProcessorParent implements
                     if (port == -1) {
                         logger.info("不支持的媒体格式，返回415");
                         // 回复不支持的格式
-                        responseAck(request, Response.UNSUPPORTED_MEDIA_TYPE); // 不支持的格式，发415
+                        try {
+                            responseAck(request, Response.UNSUPPORTED_MEDIA_TYPE); // 不支持的格式，发415
+                        } catch (SipException | InvalidArgumentException | ParseException e) {
+                            logger.error("[命令发送失败] invite 不支持的媒体格式，返回415， {}", e.getMessage());
+                        }
                         return;
                     }
 

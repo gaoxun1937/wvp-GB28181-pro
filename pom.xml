@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project 
+<project
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
 	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
@@ -14,6 +14,7 @@
 	<version>2.6.7</version>
 	<name>web video platform</name>
 	<description>国标28181视频平台</description>
+	<packaging>${project.packaging}</packaging>
 
 	<repositories>
 		<repository>
@@ -55,6 +56,42 @@
 		<asciidoctor.html.output.directory>${project.build.directory}/asciidoc/html</asciidoctor.html.output.directory>
 		<asciidoctor.pdf.output.directory>${project.build.directory}/asciidoc/pdf</asciidoctor.pdf.output.directory>
 	</properties>
+
+	<profiles>
+		<profile>
+			<id>jar</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<properties>
+				<project.packaging>jar</project.packaging>
+			</properties>
+		</profile>
+		<profile>
+			<id>war</id>
+			<properties>
+				<project.packaging>war</project.packaging>
+			</properties>
+			<dependencies>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-web</artifactId>
+					<exclusions>
+						<exclusion>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-jetty</artifactId>
+						</exclusion>
+					</exclusions>
+				</dependency>
+				<dependency>
+					<groupId>javax.servlet</groupId>
+					<artifactId>javax.servlet-api</artifactId>
+					<version>3.1.0</version>
+					<scope>provided</scope>
+				</dependency>
+			</dependencies>
+		</profile>
+	</profiles>
 
 	<dependencies>
 		<dependency>
@@ -242,13 +279,8 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 <!--			<scope>test</scope>-->
 		</dependency>
-		<dependency>
-			<groupId>org.flywaydb</groupId>
-			<artifactId>flyway-core</artifactId>
-			<version>7.15.0</version>
-		</dependency>
-	</dependencies>
 
+	</dependencies>
 
 
 	<build>
